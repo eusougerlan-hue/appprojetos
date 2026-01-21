@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { TrainingTypeEntity } from '../types';
-import { getStoredTrainingTypes, saveTrainingType, deleteTrainingType, updateTrainingType } from '../storage';
+import { TrainingTypeEntity, Client } from '../types';
+import { getStoredTrainingTypes, saveTrainingType, deleteTrainingType, updateTrainingType, getStoredClients } from '../storage';
 
 interface TrainingTypeManagementProps {
   onComplete: () => void;
@@ -9,51 +9,65 @@ interface TrainingTypeManagementProps {
 
 const TrainingTypeManagement: React.FC<TrainingTypeManagementProps> = ({ onComplete }) => {
   const [types, setTypes] = useState<TrainingTypeEntity[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [newTypeName, setNewTypeName] = useState('');
   const [editingType, setEditingType] = useState<TrainingTypeEntity | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Define a shared fetch function to avoid repeated async logic
-  const fetchTypes = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const data = await getStoredTrainingTypes();
-      setTypes(data);
+      const [typesData, clientsData] = await Promise.all([
+        getStoredTrainingTypes(),
+        getStoredClients()
+      ]);
+      setTypes(typesData);
+      setClients(clientsData);
     } catch (error) {
-      console.error('Failed to fetch training types:', error);
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Fixed: Use an async function inside useEffect to await the promise
   useEffect(() => {
-    fetchTypes();
+    fetchData();
   }, []);
 
-  // Fixed: Made the handler async and added await for storage operations and data refresh
   const handleAddOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTypeName.trim()) return;
 
-    if (editingType) {
-      const updated: TrainingTypeEntity = {
-        ...editingType,
-        name: newTypeName.trim()
-      };
-      await updateTrainingType(updated);
-      setEditingType(null);
-    } else {
-      const newType: TrainingTypeEntity = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: newTypeName.trim()
-      };
-      await saveTrainingType(newType);
+    setLoading(true);
+    try {
+      if (editingType) {
+        const updated: TrainingTypeEntity = {
+          ...editingType,
+          name: newTypeName.trim()
+        };
+        await updateTrainingType(updated);
+        setEditingType(null);
+      } else {
+        const newType: TrainingTypeEntity = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newTypeName.trim()
+        };
+        await saveTrainingType(newType);
+      }
+      setNewTypeName('');
+      await fetchData();
+    } catch (err) {
+      alert('Erro ao salvar tipo de treinamento.');
+    } finally {
+      setLoading(false);
     }
-
-    await fetchTypes();
-    setNewTypeName('');
   };
 
   const handleEditClick = (type: TrainingTypeEntity) => {
     setEditingType(type);
     setNewTypeName(type.name);
+    setConfirmDeleteId(null);
   };
 
   const handleCancelEdit = () => {
@@ -61,111 +75,158 @@ const TrainingTypeManagement: React.FC<TrainingTypeManagementProps> = ({ onCompl
     setNewTypeName('');
   };
 
-  // Fixed: Made the handler async and added await for storage operations and data refresh
-  const handleDelete = async (id: string) => {
-    if (confirm('Deseja excluir este tipo de treinamento? Compras já vinculadas manterão o nome original, mas novos lançamentos não poderão utilizá-lo.')) {
+  const handleDelete = async (id: string, name: string) => {
+    // Verificação de vínculo com compras de treinamento
+    const isLinked = clients.some(client => client.tipoTreinamento === name);
+
+    if (isLinked) {
+      alert(`BLOQUEIO: O tipo "${name}" não pode ser excluído porque está vinculado a uma ou mais compras de treinamento ativas.`);
+      setConfirmDeleteId(null);
+      return;
+    }
+
+    setLoading(true);
+    try {
       await deleteTrainingType(id);
-      await fetchTypes();
+      await fetchData();
+      setConfirmDeleteId(null);
       if (editingType?.id === id) {
         handleCancelEdit();
       }
+    } catch (err) {
+      alert('Erro ao excluir tipo.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn max-w-2xl mx-auto">
-      <div className="p-6 border-b border-gray-100">
-        <h2 className="text-xl font-bold text-gray-800">Tipos de Treinamento</h2>
-        <p className="text-sm text-gray-500">Defina as categorias de treinamento disponíveis para contratação.</p>
+    <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 animate-fadeIn max-w-2xl mx-auto overflow-hidden">
+      <div className="p-8 border-b border-gray-100 bg-white">
+        <h2 className="text-2xl font-black text-gray-800 tracking-tight">Tipos de Treinamento</h2>
+        <p className="text-sm text-gray-500 font-medium">Defina as categorias de treinamento disponíveis para contratação.</p>
       </div>
 
-      <div className="p-6">
-        <form onSubmit={handleAddOrUpdate} className="flex gap-2 mb-8">
+      <div className="p-8 pt-0">
+        <form onSubmit={handleAddOrUpdate} className="flex gap-3 mb-10 mt-8">
           <div className="flex-1 relative">
             <input
               type="text"
-              className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 outline-none transition-all ${
-                editingType ? 'border-orange-300 focus:ring-orange-500' : 'border-gray-300 focus:ring-blue-500'
+              className={`w-full px-6 py-4 rounded-2xl border focus:ring-4 outline-none transition-all font-bold text-gray-700 bg-gray-50/50 ${
+                editingType 
+                  ? 'border-orange-300 focus:ring-orange-500/10 focus:border-orange-500' 
+                  : 'border-gray-200 focus:ring-blue-500/10 focus:border-blue-500'
               }`}
               placeholder={editingType ? "Editando tipo..." : "Novo tipo (ex: Workshop, Consultoria)"}
               value={newTypeName}
               onChange={(e) => setNewTypeName(e.target.value)}
               required
+              disabled={loading}
             />
             {editingType && (
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 p-1"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 p-1 transition-colors"
                 title="Cancelar edição"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             )}
           </div>
           <button
             type="submit"
-            className={`px-6 py-2.5 rounded-lg font-bold text-white transition-all shadow-sm active:scale-95 ${
-              editingType ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'
+            disabled={loading}
+            className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-white transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center min-w-[140px] ${
+              editingType 
+                ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' 
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-blue-500/20'
             }`}
           >
-            {editingType ? 'Salvar Alteração' : 'Adicionar'}
+            {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : (editingType ? 'SALVAR' : 'ADICIONAR')}
           </button>
         </form>
 
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Tipos Cadastrados</h3>
-          {types.length === 0 ? (
-            <p className="text-center py-8 text-gray-400 italic">Nenhum tipo de treinamento cadastrado.</p>
+        <div className="space-y-4">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 ml-1">Categorias Cadastradas</h3>
+          {types.length === 0 && !loading ? (
+            <div className="text-center py-16 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+               <p className="text-sm text-gray-400 font-bold italic uppercase tracking-tighter">Nenhum tipo cadastrado ainda</p>
+            </div>
           ) : (
-            types.map((t) => (
-              <div key={t.id} className={`flex items-center justify-between p-4 bg-gray-50 rounded-xl border transition-all group ${
-                editingType?.id === t.id ? 'border-orange-300 bg-orange-50 ring-1 ring-orange-200' : 'border-gray-100 hover:border-blue-200'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-xs uppercase ${
-                    editingType?.id === t.id ? 'bg-orange-200 text-orange-700' : 'bg-blue-100 text-blue-600'
-                  }`}>
-                    {t.name.substring(0, 2)}
+            <div className="grid grid-cols-1 gap-4">
+              {types.map((t) => (
+                <div key={t.id} className={`flex items-center justify-between p-5 bg-white rounded-2xl border transition-all group ${
+                  editingType?.id === t.id 
+                    ? 'border-orange-300 bg-orange-50/20 ring-4 ring-orange-500/5' 
+                    : 'border-gray-100 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5'
+                }`}>
+                  <div className="flex items-center gap-5">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs uppercase shadow-sm ${
+                      editingType?.id === t.id ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+                    }`}>
+                      {t.name.substring(0, 2)}
+                    </div>
+                    <span className={`font-black text-base tracking-tight ${editingType?.id === t.id ? 'text-orange-900' : 'text-gray-700'}`}>
+                      {t.name}
+                    </span>
                   </div>
-                  <span className={`font-semibold ${editingType?.id === t.id ? 'text-orange-800' : 'text-gray-700'}`}>
-                    {t.name}
-                  </span>
+                  
+                  <div className="flex items-center gap-2">
+                    {confirmDeleteId === t.id ? (
+                      <div className="flex items-center gap-2 animate-fadeIn">
+                        <button
+                          onClick={() => handleDelete(t.id, t.name)}
+                          className="bg-red-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+                        >
+                          APAGAR?
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
+                        >
+                          SAIR
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleEditClick(t)}
+                          className="p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                          title="Editar tipo"
+                          disabled={loading}
+                        >
+                          <svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(t.id)}
+                          className="p-3 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          title="Excluir tipo"
+                          disabled={loading}
+                        >
+                          <svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleEditClick(t)}
-                    className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-100 rounded-lg transition-all"
-                    title="Editar tipo"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(t.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                    title="Excluir tipo"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
-        <div className="flex justify-end mt-8 pt-6 border-t border-gray-100">
+        <div className="flex justify-end mt-12 pt-8 border-t border-gray-100">
           <button
             onClick={onComplete}
-            className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-10 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-gray-700 hover:bg-gray-50 rounded-2xl transition-all"
           >
-            Fechar
+            FECHAR JANELA
           </button>
         </div>
       </div>

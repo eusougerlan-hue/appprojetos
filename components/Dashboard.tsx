@@ -21,10 +21,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
   const pendingCount = clients.filter(c => c.status === 'pending').length;
   const completedCount = logs.length;
 
-  // Fix: Added state to store users fetched asynchronously
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
-  // Fix: Added useEffect to fetch users when the component mounts or the user role changes
   useEffect(() => {
     const fetchUsers = async () => {
       if (isManager) {
@@ -39,15 +37,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
     fetchUsers();
   }, [isManager]);
 
-  // Cálculos de produtividade por técnico (Apenas para Gestores)
   const techProductivity = useMemo(() => {
     if (!isManager || allUsers.length === 0) return [];
 
-    // Fix: Using allUsers from state instead of calling getStoredUsers() synchronously
     const technicians = allUsers.filter(u => u.active !== false);
 
     return technicians.map(tech => {
-      // Clientes pendentes do mês atual para este técnico
       const techPending = clients.filter(c => {
         const startDate = new Date(c.dataInicio);
         return c.status === 'pending' && 
@@ -56,9 +51,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
                startDate.getFullYear() === currentYear;
       }).length;
 
-      // Clientes finalizados no mês atual para este técnico
-      // Como não temos 'completedAt' no cliente, checamos se o status é 'completed'
-      // e se o último log desse cliente foi no mês atual.
       const techCompleted = clients.filter(c => {
         if (c.status !== 'completed' || c.responsavelTecnico !== tech.name) return false;
         const clientLogs = logs.filter(l => l.clientId === c.id);
@@ -69,7 +61,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
                lastLogDate.getFullYear() === currentYear;
       }).length;
 
-      // Quantidade de sessões de treinamento (logs) realizadas no mês atual
       const techLogs = logs.filter(l => {
         const logDate = new Date(l.date);
         return l.employeeId === tech.id &&
@@ -93,13 +84,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
           <h1 className="text-2xl font-bold text-gray-800">Olá, {user.name.split(' ')[0]}!</h1>
           <p className="text-gray-500">Bem-vindo ao painel de controle de treinamentos.</p>
         </div>
-        <button 
-          onClick={() => setView('NEW_TRAINING')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition-all"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-          Novo Treinamento do Dia
-        </button>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -128,7 +112,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
         </div>
       </div>
 
-      {/* Seção de Produtividade (Exclusiva para Gestores) */}
       {isManager && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-slideUp">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">

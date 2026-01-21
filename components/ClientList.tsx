@@ -70,16 +70,6 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
-          <button 
-            onClick={() => setView('CLIENT_REG')}
-            className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black transition-all hover:bg-blue-700 shadow-md shadow-blue-100 active:scale-95 flex items-center gap-2 uppercase tracking-wide"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
-            </svg>
-            Novo Cliente
-          </button>
         </div>
       </div>
       

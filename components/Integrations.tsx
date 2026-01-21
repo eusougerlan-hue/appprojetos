@@ -1,56 +1,67 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { IntegrationSettings } from '../types';
 import { getStoredIntegrations, saveIntegrations, saveCloudConfigToDB } from '../storage';
+import { isSupabaseConfigured, resetSupabaseClient } from '../supabase';
 
 const Integrations: React.FC = () => {
   const [settings, setSettings] = useState<IntegrationSettings>({
     apiKey: '',
     webhookUrl: ''
   });
+  
   const [supabaseUrl, setSupabaseUrl] = useState(localStorage.getItem('SUPABASE_URL') || '');
   const [supabaseKey, setSupabaseKey] = useState(localStorage.getItem('SUPABASE_ANON_KEY') || '');
   
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    
     setLoading(true);
     try {
       const data = await getStoredIntegrations();
       setSettings(data);
     } catch (err) {
-      console.error('Certifique-se de configurar as chaves do Supabase primeiro.');
+      console.error('Erro ao buscar integrações:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (supabaseUrl && supabaseKey) {
-      fetchSettings();
-    }
-  }, []);
+    fetchSettings();
+  }, [fetchSettings]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
-      // 1. Salva chaves do banco no browser primeiro
-      localStorage.setItem('SUPABASE_URL', supabaseUrl.trim());
-      localStorage.setItem('SUPABASE_ANON_KEY', supabaseKey.trim());
+      // 1. Persiste as chaves de conexão no LocalStorage
+      const cleanUrl = supabaseUrl.trim();
+      const cleanKey = supabaseKey.trim();
+      
+      localStorage.setItem('SUPABASE_URL', cleanUrl);
+      localStorage.setItem('SUPABASE_ANON_KEY', cleanKey);
+      
+      // Reseta o cliente para garantir que o saveIntegrations use a conexão correta
+      resetSupabaseClient();
 
-      // 2. Salva configuração Cloud no banco (ID 2)
-      // Fazemos isso antes do ID 1 para garantir a conexão centralizada
-      await saveCloudConfigToDB(supabaseUrl.trim(), supabaseKey.trim());
+      // 2. Tenta persistir no banco (ID 2 para backup das chaves de nuvem e ID 1 para integrações)
+      if (cleanUrl && cleanKey) {
+        await saveCloudConfigToDB(cleanUrl, cleanKey);
+      }
 
-      // 3. Salva integrações no banco (ID 1)
       await saveIntegrations(settings);
 
-      alert('Configurações salvas e sincronizadas com a nuvem!');
-      window.location.replace(window.location.origin);
+      alert('Configurações salvas com sucesso no banco de dados!');
+      
+      // Recarrega para garantir que todo o app use o novo banco se as chaves mudaram
+      window.location.reload();
     } catch (err: any) {
-      const errorMsg = err instanceof Error ? err.message : 'Erro ao salvar. Verifique se a tabela "integrations" existe e se o RLS permite escrita.';
+      const errorMsg = err instanceof Error ? err.message : 'Erro ao salvar. Verifique se o RLS permite escrita ou se o banco está acessível.';
       alert(`Falha na Operação: ${errorMsg}`);
     } finally {
       setLoading(false);
@@ -59,7 +70,7 @@ const Integrations: React.FC = () => {
 
   const handleTestConnection = async () => {
     if (!settings.webhookUrl) {
-      alert('Informe uma URL de Webhook.');
+      alert('Informe uma URL de Webhook para testar.');
       return;
     }
     setTesting(true);
@@ -68,11 +79,16 @@ const Integrations: React.FC = () => {
         method: 'POST',
         mode: 'no-cors', 
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: 'connection_test', timestamp: new Date().toISOString(), app: 'TrainMaster Pro (Cloud)' })
+        body: JSON.stringify({ 
+          event: 'connection_test', 
+          timestamp: new Date().toISOString(), 
+          app: 'TrainMaster Pro (Cloud)',
+          status: 'ok'
+        })
       });
-      alert('Teste disparado! Verifique seu n8n/webhook.');
+      alert('Teste de conexão disparado! Verifique o recebimento no seu sistema de automação (n8n/Webhook).');
     } catch (error) {
-      alert('Erro ao conectar com o webhook.');
+      alert('Erro ao tentar conectar com o webhook. Verifique a URL e sua conexão.');
     } finally {
       setTesting(false);
     }
@@ -80,9 +96,14 @@ const Integrations: React.FC = () => {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn max-w-2xl mx-auto overflow-hidden">
-      <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-        <h2 className="text-xl font-black text-gray-800 tracking-tight">Configurações de Conexão</h2>
-        <p className="text-sm text-gray-500 font-medium">Configure as chaves do banco de dados e integrações externas.</p>
+      <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-black text-gray-800 tracking-tight">Configurações de Conexão</h2>
+          <p className="text-sm text-gray-500 font-medium">Configure as chaves do banco de dados e integrações externas.</p>
+        </div>
+        {loading && (
+          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+        )}
       </div>
 
       <form onSubmit={handleSave} className="p-8 space-y-8">
@@ -98,22 +119,20 @@ const Integrations: React.FC = () => {
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Project URL</label>
               <input 
                 type="text" 
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30" 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/5" 
                 value={supabaseUrl} 
                 onChange={e => setSupabaseUrl(e.target.value)} 
-                placeholder="https://xyz.supabase.co"
-                required
+                placeholder="https://sua-id.supabase.co"
               />
             </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">API Key (Anon Key)</label>
               <input 
                 type="password" 
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30" 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/5" 
                 value={supabaseKey} 
                 onChange={e => setSupabaseKey(e.target.value)} 
-                placeholder="eyJhbGci..."
-                required
+                placeholder="eyJhbGciOiJIUzI1Ni..."
               />
             </div>
           </div>
@@ -131,19 +150,20 @@ const Integrations: React.FC = () => {
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Chave de API do Sistema</label>
               <input 
                 type="password" 
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30" 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/5" 
                 value={settings.apiKey} 
                 onChange={e => setSettings({ ...settings, apiKey: e.target.value })} 
+                placeholder="Insira sua chave de API para automações"
               />
             </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Webhook URL (n8n / Automations)</label>
               <input 
                 type="url" 
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30" 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/5" 
                 value={settings.webhookUrl} 
                 onChange={e => setSettings({ ...settings, webhookUrl: e.target.value })} 
-                placeholder="https://sua-url-de-webhook.com"
+                placeholder="https://seu-workflow.n8n.cloud/webhook/..."
               />
             </div>
           </div>
@@ -154,7 +174,7 @@ const Integrations: React.FC = () => {
             type="button" 
             onClick={handleTestConnection} 
             disabled={testing || loading || !settings.webhookUrl} 
-            className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+            className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
           >
             {testing ? 'Disparando...' : 'Testar Webhook'}
           </button>
@@ -163,11 +183,13 @@ const Integrations: React.FC = () => {
             disabled={loading} 
             className="px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-xl shadow-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2 text-xs uppercase tracking-wider"
           >
-            {loading && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>}
-            Salvar e Sincronizar
+            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : 'Salvar e Sincronizar'}
           </button>
         </div>
       </form>
+      <div className="p-4 bg-blue-50 text-[10px] text-blue-800 font-medium leading-relaxed italic border-t border-blue-100">
+        Nota: As configurações de integração (Chave de API e Webhook) são armazenadas de forma centralizada no banco de dados, enquanto as credenciais do Supabase são armazenadas localmente no navegador para segurança e acesso imediato.
+      </div>
     </div>
   );
 };
