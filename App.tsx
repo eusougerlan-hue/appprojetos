@@ -20,9 +20,25 @@ import CommissionPayment from './components/CommissionPayment';
 import Integrations from './components/Integrations';
 import SetupView from './components/SetupView';
 
+const SESSION_KEY = 'TM_SESSION_USER';
+
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [view, setView] = useState<ViewState>('LOGIN');
+  // Inicializa o usuário a partir do localStorage para persistir entre refreshes
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Inicializa a view dependendo se há usuário ou não
+  const [view, setView] = useState<ViewState>(() => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    return saved ? 'DASHBOARD' : 'LOGIN';
+  });
+
   const [clients, setClients] = useState<Client[]>([]);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
@@ -31,7 +47,7 @@ const App: React.FC = () => {
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
 
   const refreshData = useCallback(async () => {
-    if (!isConfigured) return;
+    if (!isConfigured || !currentUser) return;
     setLoading(true);
     try {
       const [storedClients, storedLogs] = await Promise.all([
@@ -45,7 +61,7 @@ const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [isConfigured]);
+  }, [isConfigured, currentUser]);
 
   useEffect(() => {
     if (currentUser && isConfigured) {
@@ -67,11 +83,15 @@ const App: React.FC = () => {
   }, [currentUser, clients, logs]);
 
   const handleLogin = (user: User) => {
-    setCurrentUser(user);
+    // Removemos a senha por segurança antes de salvar no storage
+    const { password, ...userSafe } = user;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(userSafe));
+    setCurrentUser(userSafe as User);
     setView('DASHBOARD');
   };
 
   const handleLogout = () => {
+    localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setView('LOGIN');
     setClientToEdit(null);
