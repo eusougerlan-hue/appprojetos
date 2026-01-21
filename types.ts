@@ -48,6 +48,7 @@ export interface Client {
   duracaoHoras: number;
   residualHoursAdded?: number; // ANALÍTICO: Horas migradas de contratos anteriores
   dataInicio: string;
+  dataFim?: string; // NOVO: Data de finalização do treinamento
   valorImplantacao: number;
   comissaoPercent: number;
   status: 'pending' | 'completed';

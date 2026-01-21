@@ -154,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
         <div className="p-6 mt-auto bg-gray-50 border-t border-gray-100">
           <button
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-md shadow-red-100 mb-6 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[10px] font-black text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all shadow-md shadow-red-100 mb-4 active:scale-95"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             DESLOGAR DO SISTEMA

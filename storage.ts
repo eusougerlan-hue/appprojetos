@@ -29,6 +29,7 @@ const mapClientFromDB = (db: any): Client => ({
   duracaoHoras: Number(db.duracao_horas || 0),
   residualHoursAdded: Number(db.residual_hours_added || 0),
   dataInicio: db.data_inicio,
+  dataFim: db.data_fim || undefined,
   valorImplantacao: Number(db.valor_implantacao || 0),
   comissaoPercent: Number(db.comissao_percent || 0),
   status: db.status,
@@ -47,6 +48,7 @@ const mapClientToDB = (client: Client) => {
     duracao_horas: client.duracaoHoras,
     residual_hours_added: client.residualHoursAdded || 0,
     data_inicio: client.dataInicio,
+    data_fim: client.dataFim || null,
     valor_implantacao: client.valorImplantacao,
     comissao_percent: client.comissaoPercent,
     status: client.status,
@@ -206,8 +208,8 @@ export const deleteClient = async (clientId: string) => {
   return true;
 };
 
-export const updateClientStatus = async (clientId: string, status: 'pending' | 'completed') => {
-  const { error } = await supabase.from('clients').update({ status }).eq('id', clientId);
+export const updateClientStatus = async (clientId: string, status: 'pending' | 'completed', dataFim: string | null = null) => {
+  const { error } = await supabase.from('clients').update({ status, data_fim: dataFim }).eq('id', clientId);
   if (error) throw error;
   return true;
 };

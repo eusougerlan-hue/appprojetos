@@ -122,10 +122,13 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
     const used = getUsedHours(activeClient.id);
     const balance = activeClient.duracaoHoras - used;
     const technician = getResponsibleTechnician(activeClient);
+    
+    // Captura a data atual YYYY-MM-DD
+    const dataAtual = new Date().toISOString().split('T')[0];
 
     await triggerFinalizeWebhook(activeClient, used, balance, technician, finalizeMessage);
 
-    const success = await updateClientStatus(activeClient.id, 'completed');
+    const success = await updateClientStatus(activeClient.id, 'completed', dataAtual);
     if (success) {
       refreshData();
       closeModal();
@@ -134,7 +137,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
 
   const executeRevert = async () => {
     if (!activeClient) return;
-    const success = await updateClientStatus(activeClient.id, 'pending');
+    const success = await updateClientStatus(activeClient.id, 'pending', null);
     if (success) {
       refreshData();
       closeModal();
@@ -386,7 +389,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
                       <div className="flex flex-col items-end gap-1">
                         <span className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 text-gray-400 rounded-lg text-[10px] font-black uppercase shadow-sm">
                           <svg className="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                          Finalizado
+                          Finalizado {client.dataFim ? `em ${new Date(client.dataFim).toLocaleDateString('pt-BR')}` : ''}
                         </span>
                         <button 
                           onClick={() => handleStartRevert(client)}
