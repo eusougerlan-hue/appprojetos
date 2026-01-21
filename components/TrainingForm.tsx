@@ -181,6 +181,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       const logData: TrainingLog = {
         id: editingLogId || Math.random().toString(36).substr(2, 9),
         clientId: formData.clientId,
+        numeroProtocolo: selectedClient?.protocolo || '', // NOVO: Captura o protocolo atual do cliente
         employeeId: user.id,
         employeeName: user.name,
         date: formData.date,

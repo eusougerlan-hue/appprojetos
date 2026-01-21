@@ -84,6 +84,28 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     return list;
   }, [allClients, user, searchTerm]);
 
+  const handleCustomerChange = (cid: string) => {
+    setFormData(prev => ({ ...prev, customerId: cid }));
+    
+    // Só verifica saldo se for uma nova venda (não estiver editando)
+    if (!editingId && cid) {
+      // Busca contratos finalizados deste cliente que possuem saldo residual
+      const completedWithBalance = allClients.filter(c => 
+        c.customerId === cid && 
+        c.status === 'completed' && 
+        (c.residualHoursAdded || 0) > 0
+      );
+
+      // Soma o saldo total disponível
+      const totalBalance = completedWithBalance.reduce((acc, curr) => acc + (curr.residualHoursAdded || 0), 0);
+
+      if (totalBalance > 0) {
+        alert(`IDENTIFICADO SALDO POSITIVO!\n\nO cliente selecionado possui um saldo acumulado de ${totalBalance.toFixed(1)}h de treinamentos anteriores finalizados.\n\nEste saldo foi importado automaticamente para o campo de Carga Horária.`);
+        setFormData(prev => ({ ...prev, duracaoHoras: totalBalance }));
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading || isViewOnly) return;
@@ -365,7 +387,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                 <select 
                   className="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10 disabled:opacity-75 disabled:cursor-not-allowed" 
                   value={formData.customerId} 
-                  onChange={e => setFormData({...formData, customerId: e.target.value})} 
+                  onChange={e => handleCustomerChange(e.target.value)} 
                   required 
                   disabled={loading || isViewOnly}
                 >

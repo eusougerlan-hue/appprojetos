@@ -71,6 +71,7 @@ export enum TransportType {
 export interface TrainingLog {
   id: string;
   clientId: string;
+  numeroProtocolo: string; // NOVO: Persistência do protocolo no log
   employeeId: string;
   employeeName: string;
   date: string;

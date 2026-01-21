@@ -62,6 +62,7 @@ const mapClientToDB = (client: Client) => {
 const mapLogFromDB = (db: any): TrainingLog => ({
   id: db.id,
   clientId: db.client_id,
+  numeroProtocolo: db.numero_protocolo || '', // MAPEAMENTO: Recebe do banco
   employeeId: db.employee_id,
   employeeName: db.employee_name,
   date: db.date,
@@ -84,8 +85,9 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
-  employee_id: log.employee_id,
-  employee_name: log.employee_name,
+  numero_protocolo: log.numeroProtocolo, // MAPEAMENTO: Envia para o banco
+  employee_id: log.employeeId,
+  employee_name: log.employeeName,
   date: log.date,
   start_time_1: log.startTime1,
   end_time_1: log.endTime1,
