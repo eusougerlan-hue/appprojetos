@@ -84,8 +84,8 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
-  employee_id: log.employeeId,
-  employee_name: log.employeeName,
+  employee_id: log.employee_id,
+  employee_name: log.employee_name,
   date: log.date,
   start_time_1: log.startTime1,
   end_time_1: log.endTime1,
@@ -208,8 +208,12 @@ export const deleteClient = async (clientId: string) => {
   return true;
 };
 
-export const updateClientStatus = async (clientId: string, status: 'pending' | 'completed', dataFim: string | null = null) => {
-  const { error } = await supabase.from('clients').update({ status, data_fim: dataFim }).eq('id', clientId);
+export const updateClientStatus = async (clientId: string, status: 'pending' | 'completed', dataFim: string | null = null, residualHours: number | null = null) => {
+  const updateData: any = { status, data_fim: dataFim };
+  if (residualHours !== null) {
+    updateData.residual_hours_added = residualHours;
+  }
+  const { error } = await supabase.from('clients').update(updateData).eq('id', clientId);
   if (error) throw error;
   return true;
 };
@@ -297,6 +301,7 @@ export const deleteTrainingType = async (id: string) => {
 export const getStoredIntegrations = async (): Promise<IntegrationSettings> => {
   const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
   if (error && error.code !== 'PGRST116') throw error;
+  // Fix property name in getStoredIntegrations to match IntegrationSettings interface (webhookUrl instead of webhook_url)
   return data ? { apiKey: data.api_key, webhookUrl: data.webhook_url } : { apiKey: '', webhookUrl: '' };
 };
 

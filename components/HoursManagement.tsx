@@ -128,7 +128,8 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
 
     await triggerFinalizeWebhook(activeClient, used, balance, technician, finalizeMessage);
 
-    const success = await updateClientStatus(activeClient.id, 'completed', dataAtual);
+    // Salva status concluído, data final e saldo de horas na coluna residual_hours_added
+    const success = await updateClientStatus(activeClient.id, 'completed', dataAtual, Number(balance.toFixed(1)));
     if (success) {
       refreshData();
       closeModal();
@@ -137,7 +138,8 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
 
   const executeRevert = async () => {
     if (!activeClient) return;
-    const success = await updateClientStatus(activeClient.id, 'pending', null);
+    // Ao reverter, limpamos a data fim e o saldo de horas residual
+    const success = await updateClientStatus(activeClient.id, 'pending', null, 0);
     if (success) {
       refreshData();
       closeModal();
