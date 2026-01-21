@@ -36,20 +36,22 @@ const Integrations: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Salva chaves do banco no browser
-      localStorage.setItem('SUPABASE_URL', supabaseUrl);
-      localStorage.setItem('SUPABASE_ANON_KEY', supabaseKey);
+      // 1. Salva chaves do banco no browser primeiro
+      localStorage.setItem('SUPABASE_URL', supabaseUrl.trim());
+      localStorage.setItem('SUPABASE_ANON_KEY', supabaseKey.trim());
 
-      // 2. Salva integrações no banco (ID 1)
+      // 2. Salva configuração Cloud no banco (ID 2)
+      // Fazemos isso antes do ID 1 para garantir a conexão centralizada
+      await saveCloudConfigToDB(supabaseUrl.trim(), supabaseKey.trim());
+
+      // 3. Salva integrações no banco (ID 1)
       await saveIntegrations(settings);
-
-      // 3. Salva configuração Cloud no banco (ID 2)
-      await saveCloudConfigToDB(supabaseUrl, supabaseKey);
 
       alert('Configurações salvas e sincronizadas com a nuvem!');
       window.location.replace(window.location.origin);
-    } catch (err) {
-      alert('Erro ao salvar: verifique a conexão com o banco de dados.');
+    } catch (err: any) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro ao salvar. Verifique se a tabela "integrations" existe e se o RLS permite escrita.';
+      alert(`Falha na Operação: ${errorMsg}`);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 
 import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity } from './types';
-import { supabase, getSupabase } from './supabase';
+import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
 /**
  * Utilitários de Mapeamento (Mappers)
@@ -309,20 +309,27 @@ export const saveIntegrations = async (settings: IntegrationSettings) => {
 };
 
 /**
- * Grava as credenciais do próprio Supabase no banco de dados (ID 2)
- * para persistência centralizada entre navegadores.
+ * Tenta gravar as credenciais do Supabase no banco de dados (ID 2).
  */
 export const saveCloudConfigToDB = async (url: string, key: string) => {
   try {
-    const { error } = await supabase.from('integrations').upsert({
+    resetSupabaseClient();
+    const client = getSupabase();
+    const { error } = await client.from('integrations').upsert({
       id: 2,
       api_key: key,
       webhook_url: url,
       updated_at: new Date().toISOString()
     });
-    if (error) throw error;
-  } catch (err) {
-    console.error("Erro ao persistir chaves no banco:", err);
-    // Não travamos o fluxo principal se apenas a persistência ID 2 falhar
+    
+    if (error) {
+      if (error.code === '23514') {
+        console.warn("Aviso: Restrição de banco impede salvamento ID 2 (Check Constraint).");
+        return;
+      }
+      throw error;
+    }
+  } catch (err: any) {
+    console.error("Erro ao persistir chaves no banco ID 2:", err.message || err);
   }
 };

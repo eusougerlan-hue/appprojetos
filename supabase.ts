@@ -1,17 +1,31 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// ==============================================================================
+// CONFIGURAÇÃO CLOUD FIXA (OPCIONAL)
+// Preencha as constantes abaixo se desejar que o app já venha configurado
+// para todos os usuários em qualquer navegador.
+// ==============================================================================
+const HARDCODED_URL = 'https://zvxremuxmaqbsyucafjl.supabase.co'; // Cole sua URL aqui: https://xyz.supabase.co
+const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2eHJlbXV4bWFxYnN5dWNhZmpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NjQyMzcsImV4cCI6MjA4MzU0MDIzN30.kIBIKZqoM4GQam0JotVAUv6gI7SF-dRW8-jha5bV80U'; // Cole sua Anon Key aqui: eyJhbGci...
+// ==============================================================================
+
 let supabaseInstance: SupabaseClient | null = null;
 
+export const resetSupabaseClient = () => {
+  supabaseInstance = null;
+};
+
 export const getSupabase = (): SupabaseClient => {
-  const url = localStorage.getItem('SUPABASE_URL');
-  const key = localStorage.getItem('SUPABASE_ANON_KEY');
+  // 1. Tenta pegar do Hardcode
+  // 2. Tenta pegar do LocalStorage (configuração via tela de Setup)
+  const url = HARDCODED_URL || localStorage.getItem('SUPABASE_URL');
+  const key = HARDCODED_KEY || localStorage.getItem('SUPABASE_ANON_KEY');
 
   if (!url || !key) {
-    throw new Error('Supabase não configurado. Por favor, configure a URL e a Anon Key.');
+    throw new Error('Supabase não configurado.');
   }
 
-  // Se as chaves mudarem ou a instância for nula, recriamos o cliente
   if (!supabaseInstance) {
     supabaseInstance = createClient(url, key);
   }
@@ -19,20 +33,19 @@ export const getSupabase = (): SupabaseClient => {
   return supabaseInstance;
 };
 
-// O Proxy permite que o singleton seja exportado e usado mesmo antes da inicialização real
 export const supabase = new Proxy({} as SupabaseClient, {
   get: (target, prop: keyof SupabaseClient) => {
-    const client = getSupabase();
-    const value = (client as any)[prop];
-    
-    if (typeof value === 'function') {
-      return value.bind(client);
+    try {
+      const client = getSupabase();
+      const value = (client as any)[prop];
+      if (typeof value === 'function') return value.bind(client);
+      return value;
+    } catch (e) {
+      return undefined;
     }
-    
-    return value;
   }
 });
 
 export const isSupabaseConfigured = () => {
-  return !!localStorage.getItem('SUPABASE_URL') && !!localStorage.getItem('SUPABASE_ANON_KEY');
+  return !!HARDCODED_URL || (!!localStorage.getItem('SUPABASE_URL') && !!localStorage.getItem('SUPABASE_ANON_KEY'));
 };

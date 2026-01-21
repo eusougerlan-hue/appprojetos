@@ -17,19 +17,21 @@ const SetupView: React.FC = () => {
     const cleanKey = key.trim();
 
     try {
-      // 1. Salva no localStorage primeiro para permitir inicialização do cliente no reload
+      // 1. Salva no localStorage (Essencial para a conexão inicial)
       localStorage.setItem('SUPABASE_URL', cleanUrl);
       localStorage.setItem('SUPABASE_ANON_KEY', cleanKey);
 
-      // 2. Tenta persistir no banco de dados para sincronização futura
-      // Nota: o supabase.ts usará as chaves do localStorage para esta operação
+      // 2. Tenta persistir no banco para outros browsers (Opcional/Resiliente)
+      // Se houver erro de constraint (ID_CHECK), a função saveCloudConfigToDB agora trata internamente
       await saveCloudConfigToDB(cleanUrl, cleanKey);
 
-      // 3. Sucesso! Recarrega a aplicação de forma limpa
+      // 3. Sucesso! Recarrega a aplicação
+      // Usamos replace para evitar que o usuário volte para a tela de erro no histórico
       window.location.replace(window.location.origin);
     } catch (err: any) {
       console.error("Erro no setup inicial:", err);
-      setError('Falha ao conectar. Verifique se a URL e a Chave estão corretas e se a tabela "integrations" existe no banco.');
+      const detail = err.message || "Erro desconhecido";
+      setError(`Falha ao conectar: ${detail}. Certifique-se de que a URL e a Chave estão corretas.`);
       setLoading(false);
     }
   };
@@ -59,7 +61,8 @@ const SetupView: React.FC = () => {
 
           <form onSubmit={handleSave} className="space-y-6">
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black uppercase border border-red-100">
+              <div className="bg-red-50 text-red-600 p-4 rounded-xl text-[11px] font-bold border border-red-100 whitespace-pre-wrap leading-relaxed">
+                <span className="uppercase block mb-1">Aviso do Sistema:</span>
                 {error}
               </div>
             )}
