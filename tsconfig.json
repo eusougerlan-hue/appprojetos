@@ -24,7 +24,7 @@
     "supabase.ts",
     "types.ts",
     "storage.ts",
-    "components/**/*"
+    "components"
   ],
   "exclude": [
     "node_modules",

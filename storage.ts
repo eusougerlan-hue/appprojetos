@@ -151,16 +151,13 @@ export const deleteCustomer = async (id: string) => {
   return true;
 };
 
-// --- CLIENTS (COM SALVAMENTO RESILIENTE) ---
+// --- CLIENTS ---
 export const getStoredClients = async (): Promise<Client[]> => {
   const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(mapClientFromDB);
 };
 
-/**
- * Tenta salvar ou atualizar tratando o erro de colunas inexistentes no banco do usuário.
- */
 const performResilientClientOperation = async (payload: any, operation: 'insert' | 'update', id?: string) => {
   let currentPayload = { ...payload };
   
@@ -174,40 +171,21 @@ const performResilientClientOperation = async (payload: any, operation: 'insert'
 
   let response = await tryOperation(currentPayload);
 
-  // Erro 42703 = undefined_column (Coluna não existe na tabela)
   if (response.error && response.error.code === '42703') {
     const errorMsg = response.error.message.toLowerCase();
-    console.warn("Compatibilidade: Coluna inexistente detectada no Supabase:", response.error.message);
-    
-    // 1. Tentar remover 'observacao' se for o culpado
     if (errorMsg.includes('observacao')) {
-      console.log("Removendo campo 'observacao' e tentando novamente...");
       delete currentPayload.observacao;
       response = await tryOperation(currentPayload);
     }
-
-    // 2. Tentar trocar 'tipo_treinamento' por 'tipo_tre_namento' se for o culpado
     if (response.error && response.error.code === '42703' && errorMsg.includes('tipo_treinamento')) {
-      console.log("Tentando campo alternativo 'tipo_tre_namento'...");
       const value = currentPayload.tipo_treinamento;
       delete currentPayload.tipo_treinamento;
       currentPayload.tipo_tre_namento = value;
       response = await tryOperation(currentPayload);
     }
-    
-    // 3. Se ainda houver erro de coluna, tentar salvar sem NENHUM campo novo/suspeito
-    if (response.error && response.error.code === '42703') {
-       console.log("Tentativa final: Removendo todos os campos opcionais novos.");
-       delete currentPayload.observacao;
-       delete currentPayload.residual_hours_added;
-       response = await tryOperation(currentPayload);
-    }
   }
 
-  if (response.error) {
-    console.error(`Erro crítico no banco de dados (${operation}):`, response.error);
-    throw response.error;
-  }
+  if (response.error) throw response.error;
   return true;
 };
 
@@ -222,7 +200,6 @@ export const updateClient = async (client: Client) => {
 };
 
 export const deleteClient = async (clientId: string) => {
-  if (!clientId) throw new Error("ID do registro não fornecido.");
   const client = getSupabase();
   const { error } = await client.from('clients').delete().eq('id', clientId);
   if (error) throw error;
@@ -314,7 +291,7 @@ export const deleteTrainingType = async (id: string) => {
   if (error) throw error;
 };
 
-// --- INTEGRATIONS ---
+// --- INTEGRATIONS & CLOUD CONFIG ---
 export const getStoredIntegrations = async (): Promise<IntegrationSettings> => {
   const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
   if (error && error.code !== 'PGRST116') throw error;
@@ -329,4 +306,23 @@ export const saveIntegrations = async (settings: IntegrationSettings) => {
     updated_at: new Date().toISOString() 
   });
   if (error) throw error;
+};
+
+/**
+ * Grava as credenciais do próprio Supabase no banco de dados (ID 2)
+ * para persistência centralizada entre navegadores.
+ */
+export const saveCloudConfigToDB = async (url: string, key: string) => {
+  try {
+    const { error } = await supabase.from('integrations').upsert({
+      id: 2,
+      api_key: key,
+      webhook_url: url,
+      updated_at: new Date().toISOString()
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("Erro ao persistir chaves no banco:", err);
+    // Não travamos o fluxo principal se apenas a persistência ID 2 falhar
+  }
 };

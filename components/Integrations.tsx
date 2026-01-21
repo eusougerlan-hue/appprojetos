@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { IntegrationSettings } from '../types';
-import { getStoredIntegrations, saveIntegrations } from '../storage';
+import { getStoredIntegrations, saveIntegrations, saveCloudConfigToDB } from '../storage';
 
 const Integrations: React.FC = () => {
   const [settings, setSettings] = useState<IntegrationSettings>({
@@ -36,20 +36,20 @@ const Integrations: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Salva chaves do banco no browser
+      // 1. Salva chaves do banco no browser
       localStorage.setItem('SUPABASE_URL', supabaseUrl);
       localStorage.setItem('SUPABASE_ANON_KEY', supabaseKey);
 
-      // Salva integrações no banco
-      if (supabaseUrl && supabaseKey) {
-        await saveIntegrations(settings);
-        alert('Configurações salvas com sucesso! Recarregue a página para aplicar as chaves do banco.');
-        window.location.reload();
-      } else {
-        alert('Por favor, informe a URL e a Chave do Supabase.');
-      }
+      // 2. Salva integrações no banco (ID 1)
+      await saveIntegrations(settings);
+
+      // 3. Salva configuração Cloud no banco (ID 2)
+      await saveCloudConfigToDB(supabaseUrl, supabaseKey);
+
+      alert('Configurações salvas e sincronizadas com a nuvem!');
+      window.location.replace(window.location.origin);
     } catch (err) {
-      alert('Erro ao salvar: verifique se as chaves do Supabase estão corretas.');
+      alert('Erro ao salvar: verifique a conexão com o banco de dados.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ const Integrations: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1.5 h-6 bg-green-500 rounded-full"></div>
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Banco de Dados (Supabase)</h3>
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Banco de Dados (Cloud Config)</h3>
           </div>
           
           <div className="grid grid-cols-1 gap-4">
@@ -162,7 +162,7 @@ const Integrations: React.FC = () => {
             className="px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-xl shadow-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2 text-xs uppercase tracking-wider"
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>}
-            Salvar Tudo
+            Salvar e Sincronizar
           </button>
         </div>
       </form>

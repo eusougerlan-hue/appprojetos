@@ -1,21 +1,37 @@
 
 import React, { useState } from 'react';
+import { saveCloudConfigToDB } from '../storage';
 
 const SetupView: React.FC = () => {
   const [url, setUrl] = useState('');
   const [key, setKey] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     
-    // Pequeno delay para efeito visual de "conectando"
-    setTimeout(() => {
-      localStorage.setItem('SUPABASE_URL', url.trim());
-      localStorage.setItem('SUPABASE_ANON_KEY', key.trim());
-      window.location.reload(); // Recarrega para inicializar o cliente
-    }, 1000);
+    const cleanUrl = url.trim();
+    const cleanKey = key.trim();
+
+    try {
+      // 1. Salva no localStorage primeiro para permitir inicialização do cliente no reload
+      localStorage.setItem('SUPABASE_URL', cleanUrl);
+      localStorage.setItem('SUPABASE_ANON_KEY', cleanKey);
+
+      // 2. Tenta persistir no banco de dados para sincronização futura
+      // Nota: o supabase.ts usará as chaves do localStorage para esta operação
+      await saveCloudConfigToDB(cleanUrl, cleanKey);
+
+      // 3. Sucesso! Recarrega a aplicação de forma limpa
+      window.location.replace(window.location.origin);
+    } catch (err: any) {
+      console.error("Erro no setup inicial:", err);
+      setError('Falha ao conectar. Verifique se a URL e a Chave estão corretas e se a tabela "integrations" existe no banco.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -42,6 +58,12 @@ const SetupView: React.FC = () => {
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black uppercase border border-red-100">
+                {error}
+              </div>
+            )}
+
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Project URL</label>
               <input
@@ -51,6 +73,7 @@ const SetupView: React.FC = () => {
                 placeholder="https://sua-id.supabase.co"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -63,6 +86,7 @@ const SetupView: React.FC = () => {
                 placeholder="eyJhbGciOiJIUzI1NiI..."
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -75,7 +99,7 @@ const SetupView: React.FC = () => {
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
               ) : (
                 <>
-                  Validar e Conectar
+                  Validar e Conectar Cloud
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>

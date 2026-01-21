@@ -11,6 +11,7 @@ export const getSupabase = (): SupabaseClient => {
     throw new Error('Supabase não configurado. Por favor, configure a URL e a Anon Key.');
   }
 
+  // Se as chaves mudarem ou a instância for nula, recriamos o cliente
   if (!supabaseInstance) {
     supabaseInstance = createClient(url, key);
   }
@@ -18,6 +19,7 @@ export const getSupabase = (): SupabaseClient => {
   return supabaseInstance;
 };
 
+// O Proxy permite que o singleton seja exportado e usado mesmo antes da inicialização real
 export const supabase = new Proxy({} as SupabaseClient, {
   get: (target, prop: keyof SupabaseClient) => {
     const client = getSupabase();
