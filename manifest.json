@@ -2,8 +2,8 @@
 {
   "short_name": "TrainMaster",
   "name": "TrainMaster Pro: Gestão de Treinamentos",
-  "id": "/trainmaster-pro/",
-  "start_url": "./index.html",
+  "id": "trainmaster-pro-pwa",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
   "theme_color": "#2563eb",
