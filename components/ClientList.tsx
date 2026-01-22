@@ -23,8 +23,11 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
   };
 
   const filteredClients = useMemo(() => {
-    if (!searchTerm.trim()) return clients;
-    return clients.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Filtra apenas finalizados com saldo positivo
+    const baseList = clients.filter(c => c.status === 'completed' && (c.residualHoursAdded || 0) > 0);
+    
+    if (!searchTerm.trim()) return baseList;
+    return baseList.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [clients, searchTerm]);
 
   const handleDelete = async (client: Client) => {
@@ -51,8 +54,8 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white sticky top-0 z-10">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Todos os Clientes</h2>
-          <p className="text-sm text-gray-500">Base completa de clientes cadastrados no sistema.</p>
+          <h2 className="text-xl font-bold text-gray-800">Projetos com Saldo Residual</h2>
+          <p className="text-sm text-gray-500">Exibindo apenas treinamentos finalizados que possuem saldo de horas.</p>
         </div>
         
         <div className="flex flex-1 items-center justify-end gap-3 w-full md:w-auto">
@@ -80,8 +83,8 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Razão Social</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Responsável Técnico</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Financeiro</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Duração</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Saldo Restante</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Duração Original</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Ações</th>
             </tr>
           </thead>
@@ -89,13 +92,12 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
             {filteredClients.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">
-                  {searchTerm ? `Nenhum cliente encontrado para "${searchTerm}"` : 'Nenhum cliente cadastrado.'}
+                  {searchTerm ? `Nenhum projeto com saldo encontrado para "${searchTerm}"` : 'Nenhum projeto finalizado com saldo positivo.'}
                 </td>
               </tr>
             ) : (
               filteredClients.map((client) => {
                 const technician = getResponsibleTechnician(client);
-                const hasStarted = logs.some(l => l.clientId === client.id);
                 const isCompleted = client.status === 'completed';
 
                 return (
@@ -103,22 +105,17 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-gray-800">{client.razãoSocial}</p>
-                        {client.residualHoursAdded && client.residualHoursAdded > 0 && (
-                          <span title={`Inclui ${client.residualHoursAdded}h residuais de contratos passados`} className="w-5 h-5 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center border border-blue-100">
-                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                          </span>
-                        )}
+                        <span title={`Saldo de ${client.residualHoursAdded}h migrado de contrato finalizado`} className="w-5 h-5 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center border border-blue-100">
+                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        </span>
                       </div>
                       <p className="text-xs text-gray-400">Prot: {client.protocolo}</p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className={`text-sm font-bold ${hasStarted ? 'text-blue-600' : 'text-gray-700'}`}>
+                        <span className="text-sm font-bold text-blue-600">
                           {technician}
                         </span>
-                        {!hasStarted && (
-                          <span className="text-[9px] text-gray-400 italic">Cadastrado por</span>
-                        )}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {client.modulos.map(m => (
@@ -127,36 +124,26 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${
-                        client.status === 'pending' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-green-100 text-green-700 border border-green-200'
-                      }`}>
-                        {client.status === 'pending' ? 'PENDENTE' : 'CONCLUÍDO'}
+                      <span className="text-[10px] font-black px-2 py-1 rounded-full border bg-green-100 text-green-700 border-green-200">
+                        CONCLUÍDO
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-gray-800">R$ {client.valorImplantacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                      <p className="text-[10px] text-gray-400 font-bold">Comissão: {client.comissaoPercent}%</p>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-sm font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
+                        {client.residualHoursAdded?.toFixed(1)}h
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 text-center font-black">{client.duracaoHoras}h</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button 
-                          onClick={() => !isCompleted && onEditClient(client)}
-                          className={`p-2 rounded-lg transition-all ${isCompleted ? 'text-gray-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
-                          title={isCompleted ? "Bloqueado: Treinamento já finalizado" : "Editar cadastro"}
-                          disabled={isCompleted}
+                          onClick={() => handleView(client)}
+                          className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-all"
+                          title="Visualizar detalhes"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(client)}
-                          className={`p-2 rounded-lg transition-all ${isCompleted ? 'text-gray-300 cursor-not-allowed' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
-                          title={isCompleted ? "Bloqueado: Treinamento já finalizado" : "Excluir cliente"}
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
                       </div>
@@ -170,6 +157,11 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
       </div>
     </div>
   );
+
+  // Função auxiliar interna para visualização rápida (apenas modo leitura neste filtro)
+  function handleView(client: Client) {
+    alert(`Detalhes do Projeto:\n\nCliente: ${client.razãoSocial}\nProtocolo: ${client.protocolo}\nResponsável: ${client.responsavelTecnico}\n\nEste projeto foi finalizado com um saldo de ${client.residualHoursAdded}h que podem ser utilizadas em novas contratações.`);
+  }
 };
 
 export default ClientList;
