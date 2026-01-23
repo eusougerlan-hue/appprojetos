@@ -157,6 +157,26 @@ const Integrations: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto pb-12">
+      {/* Alerta de Configuração Obrigatória para Notificações - Atualizado para o novo painel */}
+      <div className="bg-orange-50 border-2 border-orange-200 p-6 rounded-[2rem] flex items-start gap-5 shadow-sm">
+        <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center text-white flex-shrink-0 animate-pulse">
+           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <div>
+          <h4 className="text-sm font-black text-orange-800 uppercase tracking-tight">Ativar Notificações em Tempo Real</h4>
+          <p className="text-xs text-orange-700 mt-1 leading-relaxed font-medium">
+            Seu screenshot mostrou a aba de "Replication" para BigQuery. Para notificações no App, o caminho é outro:
+          </p>
+          <ol className="text-[11px] text-orange-800 mt-3 space-y-2 font-bold list-decimal list-inside">
+            <li>No Supabase, clique no ícone <span className="underline decoration-orange-300 underline-offset-2">Table Editor</span> (Tabelas).</li>
+            <li>Selecione a tabela <strong>"clients"</strong> na lista à esquerda.</li>
+            <li>No topo, clique em <strong>"Edit Table"</strong> (ou na engrenagem de configurações).</li>
+            <li>Ative a opção <strong>"Enable Realtime"</strong>.</li>
+            <li>Clique em <strong>Save</strong> para aplicar.</li>
+          </ol>
+        </div>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
           <div>

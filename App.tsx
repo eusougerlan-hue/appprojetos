@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserRole, ViewState, Client, TrainingLog } from './types';
 import { getStoredClients, getStoredLogs } from './storage';
-import { isSupabaseConfigured, getSupabase } from './supabase';
+import { isSupabaseConfigured, getSupabase, resetSupabaseClient } from './supabase';
 import LoginForm from './components/LoginForm';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -67,11 +67,20 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isConfigured || !currentUser) return;
 
-    const supabase = getSupabase();
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch (e) {
+      console.error("Supabase não configurado corretamente para Realtime.");
+      return;
+    }
+
+    console.log('--- SISTEMA DE NOTIFICAÇÕES REALTIME ATIVO ---');
+    console.log('Aguardando registros para:', currentUser.name);
     
-    // Inscreve-se no canal de mudanças da tabela 'clients' (Compras/Vendas)
+    // Inscreve-se no canal de mudanças da tabela 'clients'
     const channel = supabase
-      .channel('realtime_notifications')
+      .channel('schema-db-changes')
       .on(
         'postgres_changes',
         {
@@ -80,28 +89,43 @@ const App: React.FC = () => {
           table: 'clients',
         },
         (payload) => {
+          console.log('%c NOVA VENDA DETECTADA PELO SISTEMA ', 'background: #222; color: #bada55', payload);
           const newClient = payload.new;
-          // Verifica se o técnico responsável da nova venda é o usuário atual
-          if (newClient.responsavel_tecnico === currentUser.name) {
+          
+          // Comparação resiliente (ignora maiúsculas, minúsculas e espaços extras)
+          const techNameDb = String(newClient.responsavel_tecnico || '').trim().toLowerCase();
+          const currentUserName = String(currentUser.name || '').trim().toLowerCase();
+
+          if (techNameDb === currentUserName) {
             setNotification({
               message: `Cliente: ${newClient.razao_social}`,
-              subMessage: `Protocolo ${newClient.protocolo} acaba de ser atribuído a você via sistema.`
+              subMessage: `O protocolo ${newClient.protocolo} acaba de ser atribuído a você!`
             });
-            // Tenta tocar um som de notificação (opcional)
+            
+            // Som de notificação
             try {
               const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-              audio.volume = 0.3;
-              audio.play();
-            } catch (e) {}
+              audio.volume = 0.4;
+              audio.play().catch(() => console.log('Interação do usuário necessária para tocar o áudio.'));
+            } catch (e) {
+              console.warn("Não foi possível tocar o áudio de notificação:", e);
+            }
             
-            // Atualiza os dados localmente
             refreshData();
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Status da conexão Realtime:', status);
+        if (status === 'CHANNEL_ERROR') {
+          console.error('ERRO CRÍTICO DE CONEXÃO: Verifique se o Realtime está habilitado na tabela "clients" via Table Editor no Supabase.');
+        } else if (status === 'SUBSCRIBED') {
+          console.log('Conexão Realtime estabelecida com sucesso!');
+        }
+      });
 
     return () => {
+      console.log('Desconectando canal Realtime...');
       supabase.removeChannel(channel);
     };
   }, [isConfigured, currentUser, refreshData]);
