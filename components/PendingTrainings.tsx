@@ -35,7 +35,7 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Treinamentos Pendentes</h2>
+          <h2 className="text-xl font-bold text-gray-800">Projetos Pendentes</h2>
           <p className="text-sm text-gray-500">Lista de clientes que aguardam início ou conclusão de treinamento.</p>
         </div>
       </div>

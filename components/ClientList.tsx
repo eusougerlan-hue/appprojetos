@@ -23,8 +23,39 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
   };
 
   const filteredClients = useMemo(() => {
-    // Filtra apenas finalizados com saldo positivo
-    const baseList = clients.filter(c => c.status === 'completed' && (c.residualHoursAdded || 0) > 0);
+    // 1. Identifica quais IDs de clientes (Customer) possuem projetos pendentes (vendas novas/ativas)
+    const customerIdsWithPending = new Set(
+      clients.filter(c => c.status === 'pending').map(c => c.customerId)
+    );
+
+    // 2. Mapa para agrupar e manter apenas o projeto concluído MAIS RECENTE por cliente
+    const latestResidualsByCustomer = new Map<string, Client>();
+
+    clients.forEach(c => {
+      // Filtra apenas finalizados com saldo positivo E que NÃO tenham uma nova compra pendente
+      if (
+        c.status === 'completed' && 
+        (c.residualHoursAdded || 0) > 0 &&
+        !customerIdsWithPending.has(c.customerId)
+      ) {
+        const existing = latestResidualsByCustomer.get(c.customerId);
+        
+        if (!existing) {
+          latestResidualsByCustomer.set(c.customerId, c);
+        } else {
+          // Se já existe um registro para este cliente, comparamos a data de finalização (ou ID se data for igual)
+          // para garantir que estamos exibindo apenas o saldo do ÚLTIMO contrato encerrado.
+          const currentEnd = c.dataFim ? new Date(c.dataFim).getTime() : 0;
+          const existingEnd = existing.dataFim ? new Date(existing.dataFim).getTime() : 0;
+          
+          if (currentEnd > existingEnd) {
+            latestResidualsByCustomer.set(c.customerId, c);
+          }
+        }
+      }
+    });
+
+    const baseList = Array.from(latestResidualsByCustomer.values());
     
     if (!searchTerm.trim()) return baseList;
     return baseList.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -55,7 +86,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
       <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white sticky top-0 z-10">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Projetos com Saldo Residual</h2>
-          <p className="text-sm text-gray-500">Exibindo apenas treinamentos finalizados que possuem saldo de horas.</p>
+          <p className="text-sm text-gray-500">Exibindo apenas o saldo mais recente de projetos finalizados disponíveis.</p>
         </div>
         
         <div className="flex flex-1 items-center justify-end gap-3 w-full md:w-auto">
@@ -82,7 +113,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
             <tr>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Razão Social</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Responsável Técnico</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Status</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Finalizado em</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Saldo Restante</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Duração Original</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Ações</th>
@@ -92,13 +123,12 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
             {filteredClients.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">
-                  {searchTerm ? `Nenhum projeto com saldo encontrado para "${searchTerm}"` : 'Nenhum projeto finalizado com saldo positivo.'}
+                  {searchTerm ? `Nenhum projeto com saldo encontrado para "${searchTerm}"` : 'Nenhum projeto com saldo residual disponível.'}
                 </td>
               </tr>
             ) : (
               filteredClients.map((client) => {
                 const technician = getResponsibleTechnician(client);
-                const isCompleted = client.status === 'completed';
 
                 return (
                   <tr key={client.id} className="hover:bg-gray-50 transition-colors">
@@ -117,15 +147,10 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
                           {technician}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {client.modulos.map(m => (
-                          <span key={m} className="text-[9px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-100 font-medium">{m}</span>
-                        ))}
-                      </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="text-[10px] font-black px-2 py-1 rounded-full border bg-green-100 text-green-700 border-green-200">
-                        CONCLUÍDO
+                      <span className="text-xs font-bold text-gray-500">
+                        {client.dataFim ? new Date(client.dataFim).toLocaleDateString('pt-BR') : '---'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -158,9 +183,8 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, onEditC
     </div>
   );
 
-  // Função auxiliar interna para visualização rápida (apenas modo leitura neste filtro)
   function handleView(client: Client) {
-    alert(`Detalhes do Projeto:\n\nCliente: ${client.razãoSocial}\nProtocolo: ${client.protocolo}\nResponsável: ${client.responsavelTecnico}\n\nEste projeto foi finalizado com um saldo de ${client.residualHoursAdded}h que podem ser utilizadas em novas contratações.`);
+    alert(`Detalhes do Saldo Residual Atual:\n\nCliente: ${client.razãoSocial}\nProtocolo: ${client.protocolo}\nResponsável: ${client.responsavelTecnico}\n\nEste é o saldo residual MAIS RECENTE deste cliente (${client.residualHoursAdded}h). Ele permanecerá aqui até que uma nova compra seja aberta ou que um saldo mais recente seja gerado.`);
   }
 };
 

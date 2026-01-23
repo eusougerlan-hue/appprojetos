@@ -81,12 +81,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
           />
           <NavItem 
             view="PENDING_LIST" 
-            label="Treinamentos Pendentes" 
+            label="Projetos Pendentes" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} 
           />
           <NavItem 
             view="NEW_TRAINING" 
-            label="Novo Treinamento" 
+            label="Treinamentos" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>} 
           />
           <NavItem 
@@ -96,7 +96,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
           />
           <NavItem 
             view="CLIENT_REG" 
-            label="Cadastro Clientes" 
+            label="Clientes" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>} 
           />
           <NavItem 
