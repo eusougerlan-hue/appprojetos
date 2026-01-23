@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserRole, ViewState, Client, TrainingLog } from './types';
 import { getStoredClients, getStoredLogs } from './storage';
-import { isSupabaseConfigured } from './supabase';
+import { isSupabaseConfigured, getSupabase } from './supabase';
 import LoginForm from './components/LoginForm';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -19,11 +19,11 @@ import ProfitabilityReport from './components/ProfitabilityReport';
 import CommissionPayment from './components/CommissionPayment';
 import Integrations from './components/Integrations';
 import SetupView from './components/SetupView';
+import NotificationToast from './components/NotificationToast';
 
 const SESSION_KEY = 'TM_SESSION_USER';
 
 const App: React.FC = () => {
-  // Inicializa o usuário a partir do localStorage para persistir entre refreshes
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(SESSION_KEY);
     try {
@@ -33,7 +33,6 @@ const App: React.FC = () => {
     }
   });
 
-  // Inicializa a view dependendo se há usuário ou não
   const [view, setView] = useState<ViewState>(() => {
     const saved = localStorage.getItem(SESSION_KEY);
     return saved ? 'DASHBOARD' : 'LOGIN';
@@ -45,6 +44,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
+  const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
 
   const refreshData = useCallback(async () => {
     if (!isConfigured || !currentUser) return;
@@ -62,6 +62,49 @@ const App: React.FC = () => {
       setLoading(false);
     }
   }, [isConfigured, currentUser]);
+
+  // Monitoramento em Tempo Real via Supabase Realtime
+  useEffect(() => {
+    if (!isConfigured || !currentUser) return;
+
+    const supabase = getSupabase();
+    
+    // Inscreve-se no canal de mudanças da tabela 'clients' (Compras/Vendas)
+    const channel = supabase
+      .channel('realtime_notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'clients',
+        },
+        (payload) => {
+          const newClient = payload.new;
+          // Verifica se o técnico responsável da nova venda é o usuário atual
+          if (newClient.responsavel_tecnico === currentUser.name) {
+            setNotification({
+              message: `Cliente: ${newClient.razao_social}`,
+              subMessage: `Protocolo ${newClient.protocolo} acaba de ser atribuído a você via sistema.`
+            });
+            // Tenta tocar um som de notificação (opcional)
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+              audio.volume = 0.3;
+              audio.play();
+            } catch (e) {}
+            
+            // Atualiza os dados localmente
+            refreshData();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isConfigured, currentUser, refreshData]);
 
   useEffect(() => {
     if (currentUser && isConfigured) {
@@ -83,7 +126,6 @@ const App: React.FC = () => {
   }, [currentUser, clients, logs]);
 
   const handleLogin = (user: User) => {
-    // Removemos a senha por segurança antes de salvar no storage
     const { password, ...userSafe } = user;
     localStorage.setItem(SESSION_KEY, JSON.stringify(userSafe));
     setCurrentUser(userSafe as User);
@@ -110,7 +152,6 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
-  // Se o Supabase não estiver configurado, forçamos a tela de Setup
   if (!isConfigured) {
     return <SetupView />;
   }
@@ -120,7 +161,15 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 flex-col lg:flex-row overflow-hidden">
+    <div className="flex h-screen bg-gray-50 flex-col lg:flex-row overflow-hidden relative">
+      {notification && (
+        <NotificationToast 
+          message={notification.message}
+          subMessage={notification.subMessage}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
       <Sidebar 
         user={currentUser} 
         onLogout={handleLogout} 
