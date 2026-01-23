@@ -131,6 +131,17 @@ export const getStoredCustomers = async (): Promise<Customer[]> => {
   return (data || []).map(mapCustomerFromDB);
 };
 
+export const getCustomerByCnpj = async (cnpj: string): Promise<Customer | null> => {
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('cnpj', cnpj)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data ? mapCustomerFromDB(data) : null;
+};
+
 export const saveCustomer = async (customer: Customer) => {
   const payload = mapCustomerToDB(customer);
   const { error } = await supabase.from('customers').insert([payload]);
