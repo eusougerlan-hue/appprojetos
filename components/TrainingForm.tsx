@@ -91,12 +91,26 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       const payload = {
         event: isUpdate ? 'training_log_updated' : 'training_log_created',
         apiKey: settings.apiKey,
-        client: { id: client?.id, razãoSocial: client?.razãoSocial, protocolo: client?.protocolo },
-        log: { id: log.id, data: log.date, horas: log.horasCalculadas, consultor: log.employeeName },
+        client: client ? {
+          id: client.id,
+          razãoSocial: client.razãoSocial,
+          protocolo: client.protocolo,
+          tipoTreinamento: client.tipoTreinamento,
+          modulos: client.modulos,
+          duracaoContratada: client.duracaoHoras,
+          status: client.status
+        } : null,
+        log: log, // Envia o objeto completo com todos os dados conforme solicitado
         timestamp: new Date().toISOString()
       };
-      fetch(settings.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(e => console.error(e));
-    } catch (error) { console.error(error); }
+      fetch(settings.webhookUrl, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+      }).catch(e => console.error('Erro silencioso no webhook:', e));
+    } catch (error) { 
+      console.error('Falha ao disparar webhook:', error); 
+    }
   };
 
   const handleEdit = (log: TrainingLog) => {
