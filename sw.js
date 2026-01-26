@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'trainmaster-v5';
+const CACHE_NAME = 'trainmaster-pro-v6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -36,22 +36,26 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  if (request.mode === 'navigate') {
+  // Estratégia Stale-While-Revalidate para ativos locais
+  if (ASSETS_TO_CACHE.some(asset => request.url.includes(asset))) {
     event.respondWith(
-      fetch(request).catch(() => {
-        return caches.match('/') || caches.match('/index.html');
+      caches.match(request).then((cachedResponse) => {
+        const fetchPromise = fetch(request).then((networkResponse) => {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, networkResponse.clone());
+          });
+          return networkResponse;
+        });
+        return cachedResponse || fetchPromise;
       })
     );
     return;
   }
 
+  // Fallback padrão para rede
   event.respondWith(
-    caches.match(request).then((response) => {
-      return response || fetch(request).catch(() => {
-        if (request.url.includes('index.tsx')) {
-          return caches.match('/index.tsx');
-        }
-      });
+    fetch(request).catch(() => {
+      return caches.match(request);
     })
   );
 });

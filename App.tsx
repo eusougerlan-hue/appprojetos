@@ -23,7 +23,6 @@ import NotificationToast from './components/NotificationToast';
 
 const SESSION_KEY = 'TM_SESSION_USER';
 
-// Função auxiliar para comparar nomes ignorando acentos e maiúsculas
 const normalizeString = (str: string) => 
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
@@ -39,7 +38,18 @@ const App: React.FC = () => {
 
   const [view, setView] = useState<ViewState>(() => {
     const saved = localStorage.getItem(SESSION_KEY);
-    return saved ? 'DASHBOARD' : 'LOGIN';
+    if (!saved) return 'LOGIN';
+    
+    // Suporte para atalhos do PWA via Query Params
+    const params = new URLSearchParams(window.location.search);
+    const requestedView = params.get('view') as ViewState;
+    const validViews: ViewState[] = ['NEW_TRAINING', 'PENDING_LIST', 'CLIENT_REG', 'DASHBOARD'];
+    
+    if (requestedView && validViews.includes(requestedView)) {
+      return requestedView;
+    }
+    
+    return 'DASHBOARD';
   });
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -48,6 +58,13 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
+
+  // Efeito para limpar query params após leitura (limpa a URL do PWA)
+  useEffect(() => {
+    if (window.location.search && currentUser) {
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, [currentUser]);
 
   const refreshData = useCallback(async () => {
     if (!isConfigured || !currentUser) return;
@@ -66,35 +83,26 @@ const App: React.FC = () => {
     }
   }, [isConfigured, currentUser]);
 
-  // EFEITO: Monitoramento Realtime Hardened
   useEffect(() => {
     if (!isConfigured || !currentUser) return;
 
     const supabase = getSupabase();
-    console.log('%c[REALTIME] Tentando conectar...', 'color: #3b82f6; font-weight: bold');
-
     const channel = supabase
       .channel('public_clients_changes')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'clients' },
         (payload) => {
-          console.log('%c[REALTIME] Novo dado detectado!', 'color: #10b981; font-weight: bold', payload);
           const newClient = payload.new;
-          
           const techInDb = normalizeString(newClient.responsavel_tecnico || '');
           const userNow = normalizeString(currentUser.name || '');
-
-          console.log(`[DEBUG] Comparando: DB(${techInDb}) com APP(${userNow})`);
 
           if (techInDb === userNow) {
             const title = `Nova Venda: ${newClient.razao_social}`;
             const body = `Protocolo ${newClient.protocolo} atribuído a você agora.`;
 
-            // 1. Toast Interno do App
             setNotification({ message: newClient.razao_social, subMessage: body });
 
-            // 2. Notificação Nativa do Sistema (Desktop/Mobile)
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification(title, {
                 body: body,
@@ -102,23 +110,17 @@ const App: React.FC = () => {
               });
             }
 
-            // 3. Som
             try {
               const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
               audio.volume = 0.5;
-              audio.play().catch(() => console.log('Áudio bloqueado pelo navegador até interação.'));
+              audio.play().catch(() => {});
             } catch (e) {}
 
             refreshData();
           }
         }
       )
-      .subscribe((status) => {
-        console.log(`%c[REALTIME] Status: ${status}`, 'color: #8b5cf6');
-        if (status === 'CHANNEL_ERROR') {
-          console.error('[ERRO] Falha no Realtime. Verifique se o RLS está permitindo SELECT na tabela clients ou se o Realtime está ativo no painel.');
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);

@@ -99,7 +99,7 @@ const Integrations: React.FC = () => {
     alert('Copiado para a área de transferência!');
   };
 
-  const apiEndpoint = `${supabaseUrl}/rest/v1/${activeResource}`;
+  const apiEndpoint = supabaseUrl ? `${supabaseUrl}/rest/v1/${activeResource}` : `/rest/v1/${activeResource}`;
 
   const getExamplePayload = () => {
     if (activeResource === 'customers') {
@@ -134,9 +134,24 @@ const Integrations: React.FC = () => {
 
   const getGetResponseExample = () => {
     if (activeResource === 'customers') {
-      return `[ { "id": "uuid", "razao_social": "EMPRESA", "cnpj": "..." } ]`;
+      return `[
+  {
+    "id": "uuid",
+    "razao_social": "EMPRESA EXEMPLO LTDA",
+    "cnpj": "00.000.000/0001-91",
+    "contacts": [...]
+  }
+]`;
     } else {
-      return `[ { "id": "uuid", "protocolo": "2024.001", "status": "pending" } ]`;
+      return `[
+  {
+    "id": "uuid",
+    "protocolo": "2024.001",
+    "status": "pending",
+    "responsavel_tecnico": "João Silva",
+    "valor_implantacao": 2500.0
+  }
+]`;
     }
   };
 
@@ -209,7 +224,7 @@ const Integrations: React.FC = () => {
         </form>
       </div>
 
-      {/* DOCUMENTAÇÃO DA API REST (RESTAURADA) */}
+      {/* DOCUMENTAÇÃO DA API REST EXPANDIDA */}
       <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-800">
         <div className="p-8 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900/50 gap-4">
           <div>
@@ -241,7 +256,7 @@ const Integrations: React.FC = () => {
                 <code className="flex-1 p-4 bg-slate-950 rounded-xl text-blue-400 font-mono text-xs border border-slate-700 break-all leading-relaxed">
                   {activeTab === 'POST' ? apiEndpoint : `${apiEndpoint}${getQueryParam()}`}
                 </code>
-                <button onClick={() => copyToClipboard(activeTab === 'POST' ? apiEndpoint : `${apiEndpoint}${getQueryParam()}`)} className="p-4 bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700">
+                <button onClick={() => copyToClipboard(activeTab === 'POST' ? apiEndpoint : `${apiEndpoint}${getQueryParam()}`)} className="p-4 bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-colors">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                 </button>
               </div>
@@ -249,23 +264,37 @@ const Integrations: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">Configuração n8n</h4>
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">Configuração n8n / Headers</h4>
                 <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700 space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-700/50">
-                    <span className="text-[10px] text-slate-400 font-bold">apikey</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">apikey</span>
                     <span className="text-[10px] text-emerald-400 font-mono">Enviada via Header</span>
                   </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-700/50">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Authorization</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">Bearer [Sua Anon Key]</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-700/50">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Content-Type</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">application/json</span>
+                  </div>
+                  {activeTab === 'POST' && (
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-700/50">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Prefer</span>
+                      <span className="text-[10px] text-emerald-400 font-mono">return=representation</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-slate-400 font-bold">Metodo</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Método HTTP</span>
                     <span className="text-[10px] text-blue-400 font-black">{activeTab}</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">Estrutura JSON</h4>
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">Estrutura JSON (Payload)</h4>
                 <div className="relative">
-                   <pre className="bg-slate-950 p-6 rounded-2xl text-[10px] font-mono text-slate-300 border border-slate-800 overflow-x-auto leading-relaxed max-h-[300px]">
+                   <pre className="bg-slate-950 p-6 rounded-2xl text-[10px] font-mono text-slate-300 border border-slate-800 overflow-x-auto leading-relaxed max-h-[300px] scrollbar-thin">
 {activeTab === 'POST' ? getExamplePayload() : getGetResponseExample()}
                    </pre>
                 </div>

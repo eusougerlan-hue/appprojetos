@@ -7,7 +7,7 @@
   "scope": "/",
   "display": "standalone",
   "theme_color": "#2563eb",
-  "background_color": "#f8fafc",
+  "background_color": "#ffffff",
   "orientation": "portrait",
   "icons": [
     {
@@ -21,6 +21,29 @@
       "type": "image/svg+xml",
       "sizes": "192x192",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Novo Atendimento",
+      "short_name": "Atender",
+      "description": "Registrar um novo treinamento",
+      "url": "/?view=NEW_TRAINING",
+      "icons": [{ "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232563eb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 4v16m8-8H4'/%3E%3C/svg%3E", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pendentes",
+      "short_name": "Pendentes",
+      "description": "Ver projetos pendentes",
+      "url": "/?view=PENDING_LIST",
+      "icons": [{ "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232563eb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E", "sizes": "192x192" }]
+    },
+    {
+      "name": "Lista de Clientes",
+      "short_name": "Clientes",
+      "description": "Acessar base de clientes",
+      "url": "/?view=CLIENT_REG",
+      "icons": [{ "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232563eb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857'/%3E%3C/svg%3E", "sizes": "192x192" }]
     }
   ]
 }
