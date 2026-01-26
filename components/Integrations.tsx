@@ -107,7 +107,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
         razao_social: "Nome da Empresa Exemplo",
         protocolo: "2024.1001",
         modulos: ["CRM", "Financeiro", "Logística"],
-        tipo_tre_namento: "Treinamento Presencial",
+        tipo_treinamento: "Treinamento Presencial",
         duracao_horas: 15,
         data_inicio: "2024-06-01",
         responsavel_tecnico: "Nome do Instrutor",

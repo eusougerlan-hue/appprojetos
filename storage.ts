@@ -28,7 +28,7 @@ const mapClientFromDB = (db: any): Client => ({
   razãoSocial: db.razao_social,
   protocolo: db.protocolo,
   modulos: db.modulos || [],
-  tipoTreinamento: db.tipo_treinamento || db.tipo_tre_namento || '',
+  tipoTreinamento: db.tipo_treinamento || '',
   duracaoHoras: Number(db.duracao_horas || 0),
   residualHoursAdded: Number(db.residual_hours_added || 0),
   dataInicio: db.data_inicio,
