@@ -71,14 +71,13 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // O saveBranding agora é resiliente e lida com erros de banco ID 3
+      // Agora o saveBranding salva no ID 1, contornando o erro de banco
       await saveBranding(branding);
-      alert('Identidade visual atualizada com sucesso!');
+      alert('Identidade visual atualizada com sucesso no banco de dados!');
       if (onBrandingChange) onBrandingChange();
-    } catch (err) {
-      // Caso caia aqui, é um erro real de código ou conexão grave
+    } catch (err: any) {
       console.error(err);
-      alert('Erro inesperado ao salvar. Tente novamente.');
+      alert(`Erro ao salvar no banco: ${err.message || 'Verifique sua conexão.'}`);
     } finally {
       setLoading(false);
     }
@@ -103,7 +102,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slideUp">
           <div className="p-6 border-b border-gray-50 bg-gray-50/30">
             <h2 className="text-xl font-black text-gray-800 tracking-tight">Personalização da Marca</h2>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Altere o nome, subtítulo e logomarca do sistema</p>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Sincronizado permanentemente com o banco de dados</p>
           </div>
           <form onSubmit={handleSaveBranding} className="p-8 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -127,14 +126,14 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
               <svg className="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <div className="text-[10px] text-blue-700 font-bold uppercase tracking-tight leading-relaxed">
-                <p>As alterações são aplicadas instantaneamente neste navegador.</p>
-                <p className="mt-1 opacity-70">Nota: Em alguns casos, a sincronização entre dispositivos pode falhar devido a restrições de banco de dados.</p>
+                <p>As alterações agora utilizam o registro principal de integrações (ID 1) para garantir a persistência em nuvem.</p>
+                <p className="mt-1 opacity-70">Todas as sessões e dispositivos verão esta marca após a atualização.</p>
               </div>
             </div>
 
             <div className="flex justify-end pt-4 border-t border-gray-50">
               <button type="submit" disabled={loading} className="px-10 py-3 bg-blue-600 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-100 transition-all active:scale-95">
-                {loading ? 'Salvando...' : 'Atualizar Identidade'}
+                {loading ? 'Salvando no Banco...' : 'Salvar no Banco de Dados'}
               </button>
             </div>
           </form>
@@ -156,6 +155,16 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Anon Key</label>
                 <input type="password" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold text-gray-700 bg-gray-50/50" value={supabaseKey} onChange={e => setSupabaseKey(e.target.value)} />
+              </div>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Webhook URL (n8n/Make)</label>
+                  <input type="url" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold text-gray-700 bg-gray-50/30" value={settings.webhookUrl} onChange={e => setSettings({ ...settings, webhookUrl: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Chave de API do Webhook</label>
+                  <input type="password" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold text-gray-700 bg-gray-50/30" value={settings.apiKey} onChange={e => setSettings({ ...settings, apiKey: e.target.value })} />
+                </div>
               </div>
             </div>
             <div className="flex justify-end pt-4 border-t border-gray-50">
