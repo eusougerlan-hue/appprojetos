@@ -157,13 +157,12 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       }
     }
 
-    // Após receber o protocolo (ou se já existir), salva no Supabase
     setLoading(true);
     setGeneratingProtocol(false);
 
     try {
       const clientData: Client = {
-        id: editingId || Math.random().toString(36).substr(2, 9), 
+        id: editingId || '', 
         customerId: formData.customerId,
         razãoSocial: selectedCustomer?.razãoSocial || '',
         protocolo: finalProtocol,
@@ -197,6 +196,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const resetForm = () => {
     setEditingId(null);
     setIsViewOnly(false);
+    setConfirmDeleteId(null);
     setFormData({
       customerId: '',
       protocolo: '',
@@ -213,7 +213,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
   const handleEdit = (client: Client) => {
     if (client.status === 'completed') {
-      alert('Treinamento finalizado não permite edição de contrato.');
+      alert('BLOQUEIO: Esta compra não pode ser editada porque o treinamento já foi FINALIZADO.');
       return;
     }
     setEditingId(client.id);
@@ -252,6 +252,13 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   };
 
   const performDelete = async (id: string) => {
+    const client = allClients.find(c => c.id === id);
+    if (client?.status === 'completed') {
+      alert('BLOQUEIO: Esta compra NÃO PODE SER EXCLUÍDA porque o projeto já foi FINALIZADO e possui histórico de horas.');
+      setConfirmDeleteId(null);
+      return;
+    }
+
     setActionLoadingId(id);
     try {
       await deleteClient(id);
@@ -299,9 +306,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                    <td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold italic">Nenhum registro encontrado.</td>
                 </tr>
               ) : visibleClients.map(client => (
-                <tr key={client.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={client.id} className={`hover:bg-slate-50 transition-colors ${client.status === 'completed' ? 'bg-emerald-50/30' : ''}`}>
                   <td className="px-8 py-5">
-                    <p className="font-black text-slate-700 text-sm leading-tight">{client.razãoSocial}</p>
+                    <div className="flex items-center gap-2">
+                       <p className="font-black text-slate-700 text-sm leading-tight">{client.razãoSocial}</p>
+                       {client.status === 'completed' && (
+                         <span className="text-[8px] font-black bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full uppercase">FINALIZADO</span>
+                       )}
+                    </div>
                     <button onClick={() => handleView(client)} className="text-[10px] text-blue-500 font-black uppercase tracking-tighter mt-1 hover:underline">
                       {client.protocolo || 'SEM PROTOCOLO'}
                     </button>
@@ -312,9 +324,19 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                   </td>
                   <td className="px-8 py-5 text-right">
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => handleEdit(client)} className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                      <button onClick={() => setConfirmDeleteId(client.id)} className="p-2.5 text-red-400 hover:bg-red-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                      <button onClick={() => handleEdit(client)} className={`p-2.5 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`} disabled={client.status === 'completed'}>
+                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(client.id)} className={`p-2.5 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200 cursor-not-allowed' : 'text-red-400 hover:bg-red-50'}`} disabled={client.status === 'completed'}>
+                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                     </div>
+                    {confirmDeleteId === client.id && (
+                       <div className="flex justify-end gap-1 mt-2 animate-fadeIn">
+                          <button onClick={() => performDelete(client.id)} className="bg-red-600 text-white px-3 py-1 text-[9px] font-black rounded-lg">APAGAR?</button>
+                          <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1 text-[9px] font-black rounded-lg">NÃO</button>
+                       </div>
+                    )}
                   </td>
                 </tr>
               ))}
