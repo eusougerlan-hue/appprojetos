@@ -21,7 +21,6 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatingProtocol, setGeneratingProtocol] = useState(false);
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
@@ -111,10 +110,10 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     
     let finalProtocol = formData.protocolo;
 
-    // FLUXO OBRIGATÓRIO: Se for nova venda ou se o protocolo estiver em branco, GERA NO MOVIDESK
+    // FLUXO: Se não tem protocolo ou é nova venda, gera no Movidesk ANTES de salvar no banco
     if (!editingId || !formData.protocolo) {
       if (!settings.webhookUrl) {
-        return alert('ERRO DE CONFIGURAÇÃO: Vá em "Integrações Cloud" e configure a URL do Webhook do n8n para gerar protocolos.');
+        return alert('ERRO: Configure o Webhook do n8n nas Integrações Cloud para gerar protocolos Movidesk.');
       }
 
       setGeneratingProtocol(true);
@@ -139,21 +138,20 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-          throw new Error(`O servidor n8n respondeu com erro (${response.status}). Verifique o fluxo.`);
-        }
+        if (!response.ok) throw new Error(`Status ${response.status} no Webhook`);
         
         const data = await response.json();
         
+        // Aqui recebemos o número (Ex: 202601004476) e salvamos na variável local
         if (data && data.protocolo) {
           finalProtocol = data.protocolo;
           setFormData(prev => ({ ...prev, protocolo: data.protocolo }));
         } else {
-          throw new Error('O Webhook respondeu, mas não enviou a chave "protocolo" no JSON.');
+          throw new Error('O Movidesk não retornou um número de protocolo válido no campo "protocolo".');
         }
       } catch (err: any) {
         setGeneratingProtocol(false);
-        return alert(`FALHA NA INTEGRAÇÃO MOVIDESK:\n${err.message || 'Erro desconhecido ao chamar webhook.'}`);
+        return alert(`FALHA NA INTEGRAÇÃO MOVIDESK:\n${err.message || 'Erro ao comunicar com n8n.'}`);
       }
     }
 
@@ -162,10 +160,10 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
     try {
       const clientData: Client = {
-        id: editingId || '', 
+        id: editingId || Math.random().toString(36).substr(2, 9), 
         customerId: formData.customerId,
         razãoSocial: selectedCustomer?.razãoSocial || '',
-        protocolo: finalProtocol,
+        protocolo: finalProtocol, // O protocolo recebido entra aqui para ser salvo no Supabase
         modulos: formData.modulos,
         tipoTreinamento: formData.tipoTreinamento,
         duracaoHoras: Number(formData.duracaoHoras),
@@ -187,10 +185,52 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       setViewMode('list');
       onComplete(); 
     } catch (err: any) {
-      alert(`ERRO AO SALVAR NO BANCO DE DADOS:\n${err.message || 'Falha na persistência.'}`);
+      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message || 'Falha na persistência.'}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const performDelete = async (id: string) => {
+    const client = allClients.find(c => c.id === id);
+    if (client?.status === 'completed') {
+      alert('SEGURANÇA: Projetos FINALIZADOS não podem ser excluídos para manter integridade dos relatórios.');
+      setConfirmDeleteId(null);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await deleteClient(id);
+      setAllClients(prev => prev.filter(c => c.id !== id));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      alert('Erro ao excluir venda.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (client: Client) => {
+    if (client.status === 'completed') {
+      alert('Contrato finalizado é imutável.');
+      return;
+    }
+    setEditingId(client.id);
+    setIsViewOnly(false);
+    setFormData({
+      customerId: client.customerId,
+      protocolo: client.protocolo,
+      modulos: client.modulos,
+      tipoTreinamento: client.tipoTreinamento,
+      duracaoHoras: client.duracaoHoras,
+      dataInicio: client.dataInicio,
+      valorImplantacao: client.valorImplantacao,
+      comissaoPercent: client.comissaoPercent,
+      responsavelTecnico: client.responsavelTecnico,
+      observacao: client.observacao || ''
+    });
+    setViewMode('form');
   };
 
   const resetForm = () => {
@@ -211,64 +251,13 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     });
   };
 
-  const handleEdit = (client: Client) => {
-    if (client.status === 'completed') {
-      alert('BLOQUEIO: Esta compra não pode ser editada porque o treinamento já foi FINALIZADO.');
-      return;
-    }
-    setEditingId(client.id);
-    setIsViewOnly(false);
-    setFormData({
-      customerId: client.customerId,
-      protocolo: client.protocolo,
-      modulos: client.modulos,
-      tipoTreinamento: client.tipoTreinamento,
-      duracaoHoras: client.duracaoHoras,
-      dataInicio: client.dataInicio,
-      valorImplantacao: client.valorImplantacao,
-      comissaoPercent: client.comissaoPercent,
-      responsavelTecnico: client.responsavelTecnico,
-      observacao: client.observacao || ''
-    });
-    setViewMode('form');
-  };
-
-  const handleView = (client: Client) => {
-    setEditingId(client.id);
-    setIsViewOnly(true);
-    setFormData({
-      customerId: client.customerId,
-      protocolo: client.protocolo,
-      modulos: client.modulos,
-      tipoTreinamento: client.tipoTreinamento,
-      duracaoHoras: client.duracaoHoras,
-      dataInicio: client.dataInicio,
-      valorImplantacao: client.valorImplantacao,
-      comissaoPercent: client.comissaoPercent,
-      responsavelTecnico: client.responsavelTecnico,
-      observacao: client.observacao || ''
-    });
-    setViewMode('form');
-  };
-
-  const performDelete = async (id: string) => {
-    const client = allClients.find(c => c.id === id);
-    if (client?.status === 'completed') {
-      alert('BLOQUEIO: Esta compra NÃO PODE SER EXCLUÍDA porque o projeto já foi FINALIZADO e possui histórico de horas.');
-      setConfirmDeleteId(null);
-      return;
-    }
-
-    setActionLoadingId(id);
-    try {
-      await deleteClient(id);
-      setAllClients(prev => prev.filter(c => c.id !== id));
-      setConfirmDeleteId(null);
-    } catch (err: any) {
-      alert(`Erro ao excluir: ${err.message}`);
-    } finally {
-      setActionLoadingId(null);
-    }
+  const toggleModule = (name: string) => {
+    setFormData(prev => ({
+      ...prev,
+      modulos: prev.modulos.includes(name)
+        ? prev.modulos.filter(m => m !== name)
+        : [...prev.modulos, name]
+    }));
   };
 
   if (viewMode === 'list') {
@@ -294,9 +283,9 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           <table className="w-full text-left">
             <thead className="bg-slate-50/50">
               <tr>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente / Protocolo</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocolo / Cliente</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Horas</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
@@ -306,35 +295,32 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                    <td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold italic">Nenhum registro encontrado.</td>
                 </tr>
               ) : visibleClients.map(client => (
-                <tr key={client.id} className={`hover:bg-slate-50 transition-colors ${client.status === 'completed' ? 'bg-emerald-50/30' : ''}`}>
+                <tr key={client.id} className={`hover:bg-slate-50 transition-colors ${client.status === 'completed' ? 'bg-emerald-50/20' : ''}`}>
                   <td className="px-8 py-5">
-                    <div className="flex items-center gap-2">
-                       <p className="font-black text-slate-700 text-sm leading-tight">{client.razãoSocial}</p>
-                       {client.status === 'completed' && (
-                         <span className="text-[8px] font-black bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full uppercase">FINALIZADO</span>
-                       )}
-                    </div>
-                    <button onClick={() => handleView(client)} className="text-[10px] text-blue-500 font-black uppercase tracking-tighter mt-1 hover:underline">
-                      {client.protocolo || 'SEM PROTOCOLO'}
-                    </button>
+                    <p className="font-black text-slate-700 text-sm leading-tight">{client.protocolo || 'SEM PROTOCOLO'}</p>
+                    <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter mt-1">{client.razãoSocial}</p>
                   </td>
-                  <td className="px-8 py-5 text-xs font-bold text-slate-500">{client.responsavelTecnico}</td>
+                  <td className="px-8 py-5 text-center font-black text-slate-700 text-sm">{client.duracaoHoras}h</td>
                   <td className="px-8 py-5 text-center">
-                    <span className="text-sm font-black text-blue-600">{client.duracaoHoras}h</span>
+                    <span className={`text-[9px] font-black px-2 py-1 rounded-full border ${
+                      client.status === 'pending' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-green-50 text-green-600 border-green-100'
+                    }`}>
+                      {client.status === 'pending' ? 'PENDENTE' : 'FINALIZADO'}
+                    </span>
                   </td>
                   <td className="px-8 py-5 text-right">
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => handleEdit(client)} className={`p-2.5 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`} disabled={client.status === 'completed'}>
+                      <button onClick={() => handleEdit(client)} className={`p-2 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200' : 'text-blue-600 hover:bg-blue-50'}`} disabled={client.status === 'completed'}>
                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button onClick={() => setConfirmDeleteId(client.id)} className={`p-2.5 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200 cursor-not-allowed' : 'text-red-400 hover:bg-red-50'}`} disabled={client.status === 'completed'}>
+                      <button onClick={() => setConfirmDeleteId(client.id)} className={`p-2 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200' : 'text-red-400 hover:bg-red-50'}`} disabled={client.status === 'completed'}>
                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                     {confirmDeleteId === client.id && (
-                       <div className="flex justify-end gap-1 mt-2 animate-fadeIn">
-                          <button onClick={() => performDelete(client.id)} className="bg-red-600 text-white px-3 py-1 text-[9px] font-black rounded-lg">APAGAR?</button>
-                          <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1 text-[9px] font-black rounded-lg">NÃO</button>
+                       <div className="flex justify-end gap-2 mt-2 animate-fadeIn">
+                          <button onClick={() => performDelete(client.id)} className="bg-red-600 text-white px-3 py-1 text-[9px] font-black rounded-lg">Confirmar?</button>
+                          <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1 text-[9px] font-black rounded-lg">Sair</button>
                        </div>
                     )}
                   </td>
@@ -348,126 +334,102 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   }
 
   return (
-    <div className="relative">
-      {/* OVERLAY DE AGUARDO PARA GERAÇÃO DO PROTOCOLO MOVIDESK */}
-      {(generatingProtocol || loading) && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fadeIn">
-          <div className="bg-white rounded-[3rem] p-12 max-w-sm w-full text-center shadow-2xl border border-slate-100 flex flex-col items-center gap-8 animate-slideUp">
-            <div className="relative">
-              <div className="w-24 h-24 border-[6px] border-blue-500/10 border-t-blue-600 rounded-full animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <svg className="w-10 h-10 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-2xl font-black text-slate-800 mb-3 tracking-tight">Processando Venda</h3>
-              <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] leading-relaxed">
-                {generatingProtocol ? 'Solicitando protocolo ao Movidesk via n8n...' : 'Persistindo dados na nuvem...'}
-              </p>
-            </div>
-            <div className="bg-slate-50 px-6 py-3 rounded-2xl border border-slate-100">
-               <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Sincronização em curso</span>
+    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp max-w-4xl mx-auto overflow-hidden relative">
+        {/* OVERLAY DE CARREGAMENTO / GERAÇÃO - Bloqueia interação enquanto espera o n8n */}
+        {(generatingProtocol || loading) && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center animate-fadeIn">
+            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+            <div className="text-center">
+               <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">
+                 {generatingProtocol ? 'Gerando Protocolo Movidesk...' : 'Salvando Venda...'}
+               </h3>
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
+                 Aguarde a sincronização com o Cloud Center
+               </p>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp max-w-4xl mx-auto overflow-hidden">
-        <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/20">
+        <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
             <div>
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                {isViewOnly ? 'Resumo da Venda' : editingId ? 'Editar Contrato' : 'Nova Venda de Treino'}
+                {isViewOnly ? 'Visualizar Venda' : editingId ? 'Editar Contrato' : 'Nova Venda de Treinamento'}
               </h2>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Fluxo síncrono n8n -> Movidesk</p>
-              </div>
+              <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2">Sincronização Cloud Ativada</p>
             </div>
-            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-xl border border-slate-50">
+            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-12 space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <form onSubmit={handleSubmit} className="p-10 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="md:col-span-2">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Cliente Beneficiário</label>
-                  <select className="w-full px-8 py-5 rounded-[1.25rem] border border-slate-200 focus:border-blue-500 outline-none font-black text-slate-700 bg-slate-50/50 shadow-inner transition-all focus:ring-4 focus:ring-blue-500/5 disabled:opacity-60" value={formData.customerId} onChange={e => handleCustomerChange(e.target.value)} required disabled={isViewOnly || loading}>
-                    <option value="">Selecione um cliente da base...</option>
-                    {customers.map(c => <option key={c.id} value={c.id}>{c.razãoSocial}</option>)}
-                  </select>
-              </div>
-              
-              <div className="space-y-10">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Número do Protocolo</label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        className={`w-full px-8 py-5 rounded-[1.25rem] border outline-none font-black text-[13px] shadow-inner transition-all ${generatingProtocol ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-100 border-slate-200 text-slate-400'}`} 
-                        value={generatingProtocol ? 'GERANDO PROTOCOLO...' : formData.protocolo || 'AGUARDANDO SALVAMENTO...'} 
-                        readOnly 
-                      />
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2">
-                         <svg className={`w-5 h-5 ${formData.protocolo ? 'text-emerald-500' : 'text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Tipo de Treinamento</label>
-                    <select className="w-full px-8 py-5 rounded-[1.25rem] border border-slate-200 focus:border-blue-500 outline-none font-black text-slate-700 bg-slate-50/50 shadow-inner transition-all disabled:opacity-60" value={formData.tipoTreinamento} onChange={e => setFormData({...formData, tipoTreinamento: e.target.value})} required disabled={isViewOnly || loading}>
-                        {availableTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                    </select>
-                  </div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Cliente Beneficiário</label>
+                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-slate-50/50 transition-all disabled:opacity-50" value={formData.customerId} onChange={e => handleCustomerChange(e.target.value)} required disabled={isViewOnly || !!editingId}>
+                  <option value="">Selecione o cliente da base...</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.razãoSocial}</option>)}
+                </select>
               </div>
 
-              <div className="space-y-10">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Data de Início Prevista</label>
-                    <input type="date" className="w-full px-8 py-5 rounded-[1.25rem] border border-slate-200 focus:border-blue-500 outline-none font-black text-slate-700 bg-slate-50/50 shadow-inner transition-all disabled:opacity-60" value={formData.dataInicio} onChange={e => setFormData({...formData, dataInicio: e.target.value})} required disabled={isViewOnly || loading} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Responsável Técnico</label>
-                    <select className="w-full px-8 py-5 rounded-[1.25rem] border border-slate-200 focus:border-blue-500 outline-none font-black text-slate-700 bg-slate-50/50 shadow-inner transition-all disabled:opacity-60" value={formData.responsavelTecnico} onChange={e => setFormData({...formData, responsavelTecnico: e.target.value})} required disabled={isViewOnly || loading}>
-                        {activeUsers.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-                    </select>
-                  </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Número do Protocolo</label>
+                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-blue-600 bg-slate-100 cursor-not-allowed" value={formData.protocolo} readOnly placeholder="Ex: 202601004476 (Auto)" />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Tipo de Treinamento</label>
+                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-slate-50/50 transition-all" value={formData.tipoTreinamento} onChange={e => setFormData({...formData, tipoTreinamento: e.target.value})} required disabled={isViewOnly}>
+                    {availableTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                </select>
               </div>
 
               <div className="md:col-span-2">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Observação do Contrato</label>
-                  <textarea className="w-full px-8 py-5 rounded-[1.25rem] border border-slate-200 focus:border-blue-500 outline-none font-medium text-slate-600 bg-slate-50/50 shadow-inner transition-all resize-none min-h-[140px] disabled:opacity-60" value={formData.observacao} onChange={e => setFormData({...formData, observacao: e.target.value})} placeholder="Insira detalhes adicionais sobre o atendimento..." disabled={isViewOnly || loading} />
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Módulos do Sistema Contratados</label>
+                <div className="flex flex-wrap gap-2">
+                   {availableModules.map(mod => {
+                     const active = formData.modulos.includes(mod.name);
+                     return (
+                       <button key={mod.id} type="button" onClick={() => toggleModule(mod.name)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black border transition-all ${active ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-300'}`} disabled={isViewOnly}>
+                         {mod.name}
+                       </button>
+                     );
+                   })}
+                </div>
               </div>
 
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 border-t border-slate-50">
-                  <div className="bg-slate-50/80 p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Carga Horária (h)</label>
-                    <input type="number" step="0.5" className="w-full px-2 py-1 rounded-xl border-none focus:ring-0 outline-none font-black text-3xl text-blue-600 bg-transparent" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly || loading} />
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-50">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Carga Horária (h)</label>
+                    <input type="number" step="0.5" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-700 bg-slate-50/50" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
-                  <div className="bg-slate-50/80 p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Valor Contrato (R$)</label>
-                    <input type="number" step="0.01" className="w-full px-2 py-1 rounded-xl border-none focus:ring-0 outline-none font-black text-3xl text-slate-800 bg-transparent" value={formData.valorImplantacao} onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} required disabled={isViewOnly || loading} />
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Valor Contrato (R$)</label>
+                    <input type="number" step="0.01" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-700 bg-slate-50/50" value={formData.valorImplantacao} onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
-                  <div className="bg-slate-50/80 p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Comissão (%)</label>
-                    <input type="number" step="0.1" className="w-full px-2 py-1 rounded-xl border-none focus:ring-0 outline-none font-black text-3xl text-slate-800 bg-transparent" value={formData.comissaoPercent} onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} required disabled={isViewOnly || loading} />
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Comissão (%)</label>
+                    <input type="number" step="1" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-700 bg-slate-50/50" value={formData.comissaoPercent} onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Informações Adicionais / Observação</label>
+                <textarea className="w-full px-6 py-4 rounded-2xl border border-slate-200 outline-none font-medium text-slate-600 bg-slate-50/50 transition-all resize-none min-h-[120px]" value={formData.observacao} onChange={e => setFormData({...formData, observacao: e.target.value})} placeholder="Insira detalhes sobre a venda ou logística..." disabled={isViewOnly} />
               </div>
             </div>
 
-            <div className="flex justify-end gap-6 pt-12 border-t border-slate-100">
-              <button type="button" onClick={() => setViewMode('list')} className="px-10 py-5 text-slate-400 hover:text-slate-600 font-black uppercase text-[10px] tracking-widest transition-all rounded-2xl">
-                  {isViewOnly ? 'Fechar Detalhes' : 'Desistir'}
-              </button>
-              {!isViewOnly && (
-                <button type="submit" className="px-20 py-5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-[1.25rem] shadow-2xl shadow-blue-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4 uppercase tracking-[0.25em] text-[10px]" disabled={loading || generatingProtocol}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                    Confirmar Venda
-                </button>
-              )}
+            <div className="flex justify-end gap-4 pt-10 border-t border-slate-100">
+               <button type="button" onClick={() => setViewMode('list')} className="px-10 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600">
+                 {isViewOnly ? 'FECHAR' : 'CANCELAR'}
+               </button>
+               {!isViewOnly && (
+                 <button type="submit" disabled={generatingProtocol || loading} className="px-16 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-2xl shadow-blue-100 transition-all active:scale-95 uppercase tracking-widest text-[10px]">
+                   {editingId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR VENDA'}
+                 </button>
+               )}
             </div>
         </form>
-      </div>
     </div>
   );
 };
