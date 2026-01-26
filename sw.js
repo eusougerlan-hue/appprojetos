@@ -1,11 +1,12 @@
 
-const CACHE_NAME = 'trainmaster-pro-v10';
+const CACHE_NAME = 'trainmaster-pro-v11';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './index.tsx',
   'https://cdn.tailwindcss.com',
+  'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
 
