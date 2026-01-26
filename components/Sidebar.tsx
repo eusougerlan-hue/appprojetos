@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { User, UserRole, ViewState } from '../types';
+import { User, UserRole, ViewState, BrandingConfig } from '../types';
 
 interface SidebarProps {
   user: User | null;
@@ -9,9 +9,10 @@ interface SidebarProps {
   currentView: ViewState;
   isOpen?: boolean;
   onClose?: () => void;
+  branding: BrandingConfig;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView, isOpen, onClose, branding }) => {
   const isManager = user?.role === UserRole.MANAGER;
 
   const NavItem = ({ view, label, icon }: { view: ViewState, label: string, icon: React.ReactNode }) => (
@@ -50,15 +51,19 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
       `}>
         <div className="p-8 mb-4 flex justify-between items-center">
           <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-               <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="leading-none">TrainMaster</span>
-              <span className="text-[10px] text-blue-500 uppercase tracking-widest mt-1">SISTEMA PRO</span>
+             {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
+              ) : (
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                    <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                  </svg>
+                </div>
+              )}
+            <div className="flex flex-col truncate">
+              <span className="leading-none truncate">{branding.appName}</span>
+              <span className="text-[10px] text-blue-500 uppercase tracking-widest mt-1 truncate">{branding.appSubtitle}</span>
             </div>
           </h2>
           

@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, BrandingConfig } from '../types';
 import { getStoredUsers } from '../storage';
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
+  branding: BrandingConfig;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onLogin, branding }) => {
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -43,8 +44,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-8">
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold text-gray-800">TrainMaster Pro</h1>
-            <p className="text-gray-500 mt-2">Gestão de Treinamentos (Modo Cloud)</p>
+             {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt="Logo" className="h-16 mx-auto mb-4 object-contain" />
+              ) : (
+                <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white shadow-lg">
+                  <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                    <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                  </svg>
+                </div>
+              )}
+            <h1 className="text-3xl font-bold text-gray-800 tracking-tight">{branding.appName}</h1>
+            <p className="text-gray-500 mt-2 font-medium">{branding.appSubtitle}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -94,7 +105,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           </form>
 
           <div className="mt-8 text-center text-xs text-gray-400">
-            Desenvolvido por TrainMaster Pro &copy; 2024
+            Desenvolvido por {branding.appName} &copy; 2024
           </div>
         </div>
       </div>

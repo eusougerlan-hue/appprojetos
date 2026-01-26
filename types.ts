@@ -15,6 +15,12 @@ export interface User {
   active?: boolean;
 }
 
+export interface BrandingConfig {
+  appName: string;
+  appSubtitle: string;
+  logoUrl: string;
+}
+
 export interface TrainingTypeEntity {
   id: string;
   name: string;

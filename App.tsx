@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { User, UserRole, ViewState, Client, TrainingLog } from './types';
-import { getStoredClients, getStoredLogs } from './storage';
+import { User, UserRole, ViewState, Client, TrainingLog, BrandingConfig } from './types';
+import { getStoredClients, getStoredLogs, getStoredBranding } from './storage';
 import { isSupabaseConfigured, getSupabase } from './supabase';
 import LoginForm from './components/LoginForm';
 import Sidebar from './components/Sidebar';
@@ -54,6 +54,11 @@ const App: React.FC = () => {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
+  const [branding, setBranding] = useState<BrandingConfig>({
+    appName: 'TrainMaster',
+    appSubtitle: 'SISTEMA PRO',
+    logoUrl: ''
+  });
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
   const [loading, setLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -67,21 +72,27 @@ const App: React.FC = () => {
   }, [currentUser]);
 
   const refreshData = useCallback(async () => {
-    if (!isConfigured || !currentUser) return;
+    if (!isConfigured) return;
     setLoading(true);
     try {
-      const [storedClients, storedLogs] = await Promise.all([
-        getStoredClients(),
-        getStoredLogs()
+      const [storedClients, storedLogs, storedBranding] = await Promise.all([
+        currentUser ? getStoredClients() : Promise.resolve([]),
+        currentUser ? getStoredLogs() : Promise.resolve([]),
+        getStoredBranding()
       ]);
       setClients(storedClients);
       setLogs(storedLogs);
+      setBranding(storedBranding);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
     } finally {
       setLoading(false);
     }
   }, [isConfigured, currentUser]);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   useEffect(() => {
     if (!isConfigured || !currentUser) return;
@@ -127,12 +138,6 @@ const App: React.FC = () => {
     };
   }, [isConfigured, currentUser, refreshData]);
 
-  useEffect(() => {
-    if (currentUser && isConfigured) {
-      refreshData();
-    }
-  }, [view, currentUser, refreshData, isConfigured]);
-
   const filteredData = useMemo(() => {
     if (!currentUser) return { clients: [], logs: [] };
     if (currentUser.role === UserRole.MANAGER) {
@@ -162,7 +167,7 @@ const App: React.FC = () => {
   };
 
   if (!isConfigured) return <SetupView />;
-  if (view === 'LOGIN') return <LoginForm onLogin={handleLogin} />;
+  if (view === 'LOGIN') return <LoginForm onLogin={handleLogin} branding={branding} />;
 
   return (
     <div className="flex h-screen bg-gray-50 flex-col lg:flex-row overflow-hidden relative">
@@ -181,6 +186,7 @@ const App: React.FC = () => {
         currentView={view} 
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        branding={branding}
       />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
@@ -218,7 +224,7 @@ const App: React.FC = () => {
             {view === 'TRAINING_TYPE_MGMT' && <TrainingTypeManagement onComplete={() => setView('DASHBOARD')} />}
             {view === 'PROFITABILITY' && <ProfitabilityReport clients={clients} logs={logs} />}
             {view === 'COMMISSION_PAYMENT' && <CommissionPayment clients={clients} refreshData={refreshData} />}
-            {view === 'INTEGRATIONS' && <Integrations />}
+            {view === 'INTEGRATIONS' && <Integrations onBrandingChange={refreshData} />}
           </div>
         </main>
       </div>

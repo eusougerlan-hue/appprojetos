@@ -1,5 +1,5 @@
 
-import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity } from './types';
+import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity, BrandingConfig } from './types';
 import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
 /**
@@ -314,7 +314,6 @@ export const deleteTrainingType = async (id: string) => {
 export const getStoredIntegrations = async (): Promise<IntegrationSettings> => {
   const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
   if (error && error.code !== 'PGRST116') throw error;
-  // Fix property name in getStoredIntegrations to match IntegrationSettings interface (webhookUrl instead of webhook_url)
   return data ? { apiKey: data.api_key, webhookUrl: data.webhook_url } : { apiKey: '', webhookUrl: '' };
 };
 
@@ -323,6 +322,50 @@ export const saveIntegrations = async (settings: IntegrationSettings) => {
     id: 1, 
     api_key: settings.apiKey, 
     webhook_url: settings.webhookUrl,
+    updated_at: new Date().toISOString() 
+  });
+  if (error) throw error;
+};
+
+// --- BRANDING ---
+export const getStoredBranding = async (): Promise<BrandingConfig> => {
+  const { data, error } = await supabase.from('integrations').select('*').eq('id', 3).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  
+  if (data) {
+    try {
+      const config = JSON.parse(data.webhook_url);
+      return {
+        appName: data.api_key || 'TrainMaster',
+        appSubtitle: config.subtitle || 'SISTEMA PRO',
+        logoUrl: config.logoUrl || ''
+      };
+    } catch {
+       return {
+        appName: data.api_key || 'TrainMaster',
+        appSubtitle: 'SISTEMA PRO',
+        logoUrl: data.webhook_url || ''
+      };
+    }
+  }
+  
+  return {
+    appName: 'TrainMaster',
+    appSubtitle: 'SISTEMA PRO',
+    logoUrl: ''
+  };
+};
+
+export const saveBranding = async (config: BrandingConfig) => {
+  const jsonConfig = JSON.stringify({ 
+    subtitle: config.appSubtitle, 
+    logoUrl: config.logoUrl 
+  });
+  
+  const { error } = await supabase.from('integrations').upsert({ 
+    id: 3, 
+    api_key: config.appName, 
+    webhook_url: jsonConfig,
     updated_at: new Date().toISOString() 
   });
   if (error) throw error;
