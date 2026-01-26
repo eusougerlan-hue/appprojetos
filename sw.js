@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'trainmaster-pro-v8';
+const CACHE_NAME = 'trainmaster-pro-v10';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

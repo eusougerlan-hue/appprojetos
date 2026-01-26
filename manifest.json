@@ -3,7 +3,7 @@
   "name": "TrainMaster Pro",
   "short_name": "TrainMaster",
   "description": "Gestão Avançada de Treinamentos",
-  "id": "com.trainmaster.pro",
+  "id": "com.trainmaster.pro.v2",
   "start_url": "./index.html",
   "display": "standalone",
   "display_override": ["standalone", "window-controls-overlay"],
