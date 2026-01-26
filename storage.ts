@@ -3,9 +3,11 @@ import { User, Client, TrainingLog, UserRole, SystemModule, Customer, Integratio
 import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
 /**
- * Chaves para o LocalStorage (Branding Cache)
+ * Chaves para o LocalStorage (Branding Cache e Config Cloud)
  */
 const BRANDING_LOCAL_KEY = 'TM_BRANDING_DATA';
+const SUPABASE_URL_KEY = 'SUPABASE_URL';
+const SUPABASE_KEY_KEY = 'SUPABASE_ANON_KEY';
 
 const mapCustomerFromDB = (db: any): Customer => ({
   id: db.id,
@@ -26,7 +28,7 @@ const mapClientFromDB = (db: any): Client => ({
   razãoSocial: db.razao_social,
   protocolo: db.protocolo,
   modulos: db.modulos || [],
-  tipoTreinamento: db.tipo_tre_namento || db.tipo_treinamento || '',
+  tipoTreinamento: db.tipo_treinamento || db.tipo_tre_namento || '',
   duracaoHoras: Number(db.duracao_horas || 0),
   residualHoursAdded: Number(db.residual_hours_added || 0),
   dataInicio: db.data_inicio,
@@ -267,36 +269,38 @@ export const deleteTrainingType = async (id: string) => {
   if (error) throw error;
 };
 
-// --- INTEGRATIONS & BRANDING UNIFICADOS (ID 1) ---
+// --- INTEGRATIONS & BRANDING UNIFICADOS NO ID 1 ---
 
 /**
- * Helper para ler o registro central (ID 1) que contém Integrações + Branding
+ * Lê a configuração centralizada (ID 1)
  */
 const getCentralConfig = async () => {
-  const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
-  if (error && error.code !== 'PGRST116') throw error;
-  
-  if (data) {
-    try {
-      // Tenta ler o JSON do campo webhook_url
-      const json = JSON.parse(data.webhook_url);
-      return {
-        appName: data.api_key || 'TrainMaster',
-        webhookUrl: json.webhookUrl || '',
-        integrationApiKey: json.integrationApiKey || '',
-        appSubtitle: json.appSubtitle || 'SISTEMA PRO',
-        logoUrl: json.logoUrl || ''
-      };
-    } catch {
-      // Fallback para formato antigo (quando webhook_url era apenas uma string de URL)
-      return {
-        appName: 'TrainMaster',
-        webhookUrl: data.webhook_url || '',
-        integrationApiKey: data.api_key || '',
-        appSubtitle: 'SISTEMA PRO',
-        logoUrl: ''
-      };
+  try {
+    const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    
+    if (data) {
+      try {
+        const parsed = JSON.parse(data.webhook_url);
+        return {
+          appName: data.api_key || 'TrainMaster',
+          webhookUrl: parsed.webhookUrl || '',
+          integrationApiKey: parsed.integrationApiKey || '',
+          appSubtitle: parsed.appSubtitle || 'SISTEMA PRO',
+          logoUrl: parsed.logoUrl || ''
+        };
+      } catch {
+        return {
+          appName: 'TrainMaster',
+          webhookUrl: data.webhook_url || '',
+          integrationApiKey: data.api_key || '',
+          appSubtitle: 'SISTEMA PRO',
+          logoUrl: ''
+        };
+      }
     }
+  } catch (err) {
+    console.error("Erro ao buscar central config:", err);
   }
   return null;
 };
@@ -326,15 +330,6 @@ export const saveIntegrations = async (settings: IntegrationSettings) => {
 };
 
 export const getStoredBranding = async (): Promise<BrandingConfig> => {
-  // 1. Prioridade para LocalStorage (Cache rápido)
-  const local = localStorage.getItem(BRANDING_LOCAL_KEY);
-  if (local) {
-    try {
-      return JSON.parse(local);
-    } catch (e) {}
-  }
-
-  // 2. Busca no Banco de Dados (ID 1)
   const config = await getCentralConfig();
   if (config) {
     const branding = {
@@ -346,14 +341,15 @@ export const getStoredBranding = async (): Promise<BrandingConfig> => {
     return branding;
   }
 
+  const local = localStorage.getItem(BRANDING_LOCAL_KEY);
+  if (local) {
+    try { return JSON.parse(local); } catch (e) {}
+  }
+
   return { appName: 'TrainMaster', appSubtitle: 'SISTEMA PRO', logoUrl: '' };
 };
 
 export const saveBranding = async (config: BrandingConfig) => {
-  // 1. Salva localmente
-  localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(config));
-
-  // 2. Salva no Banco de Dados (ID 1)
   const current = await getCentralConfig();
   const jsonPayload = JSON.stringify({
     webhookUrl: current?.webhookUrl || '',
@@ -370,12 +366,32 @@ export const saveBranding = async (config: BrandingConfig) => {
   });
   
   if (error) throw error;
+  localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(config));
   return true;
+};
+
+/**
+ * Recupera URL/Key do Supabase salvos no banco (ID 2) caso o localStorage suma
+ */
+export const getStoredCloudConfig = async () => {
+  try {
+    const { data, error } = await supabase.from('integrations').select('*').eq('id', 2).single();
+    if (error) return null;
+    return {
+      url: data.webhook_url, 
+      key: data.api_key      
+    };
+  } catch (err) {
+    return null;
+  }
 };
 
 export const saveCloudConfigToDB = async (url: string, key: string) => {
   try {
     resetSupabaseClient();
+    localStorage.setItem(SUPABASE_URL_KEY, url);
+    localStorage.setItem(SUPABASE_KEY_KEY, key);
+    
     const client = getSupabase();
     await client.from('integrations').upsert({
       id: 2,
@@ -383,5 +399,7 @@ export const saveCloudConfigToDB = async (url: string, key: string) => {
       webhook_url: url,
       updated_at: new Date().toISOString()
     });
-  } catch (err) {}
+  } catch (err) {
+    console.error("Falha ao persistir cloud config no DB:", err);
+  }
 };

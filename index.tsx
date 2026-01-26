@@ -3,18 +3,23 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Registro do Service Worker para PWA
+// Registro do Service Worker para PWA (Apenas em origens seguras e fora de sandbox)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Usar o caminho relativo direto './sw.js' é a forma mais segura
-    // para garantir que o navegador busque o arquivo na mesma origem do sandbox.
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => {
-        console.log('Service Worker registrado com sucesso no escopo:', reg.scope);
-      })
-      .catch(err => {
-        console.error('Falha ao registrar Service Worker:', err);
-      });
+    // Evita erro de origin mismatch em sandboxes do Google/AI Studio
+    const isSandbox = window.location.hostname.includes('goog') || window.location.hostname === 'localhost';
+    
+    if (!isSandbox) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+          console.log('Service Worker registrado com sucesso no escopo:', reg.scope);
+        })
+        .catch(err => {
+          console.error('Falha ao registrar Service Worker:', err);
+        });
+    } else {
+      console.log('Service Worker ignorado neste ambiente de desenvolvimento/sandbox.');
+    }
   });
 }
 

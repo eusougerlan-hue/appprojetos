@@ -39,16 +39,10 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(() => {
     const saved = localStorage.getItem(SESSION_KEY);
     if (!saved) return 'LOGIN';
-    
-    // Suporte para atalhos do PWA via Query Params
     const params = new URLSearchParams(window.location.search);
     const requestedView = params.get('view') as ViewState;
     const validViews: ViewState[] = ['NEW_TRAINING', 'PENDING_LIST', 'CLIENT_REG', 'DASHBOARD'];
-    
-    if (requestedView && validViews.includes(requestedView)) {
-      return requestedView;
-    }
-    
+    if (requestedView && validViews.includes(requestedView)) return requestedView;
     return 'DASHBOARD';
   });
 
@@ -64,7 +58,6 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
 
-  // Efeito para limpar query params após leitura (limpa a URL do PWA)
   useEffect(() => {
     if (window.location.search && currentUser) {
       window.history.replaceState({}, document.title, "/");
@@ -96,53 +89,29 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!isConfigured || !currentUser) return;
-
     const supabase = getSupabase();
     const channel = supabase
       .channel('public_clients_changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'clients' },
-        (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, (payload) => {
           const newClient = payload.new;
           const techInDb = normalizeString(newClient.responsavel_tecnico || '');
           const userNow = normalizeString(currentUser.name || '');
-
           if (techInDb === userNow) {
-            const title = `Nova Venda: ${newClient.razao_social}`;
-            const body = `Protocolo ${newClient.protocolo} atribuído a você agora.`;
-
-            setNotification({ message: newClient.razao_social, subMessage: body });
-
+            setNotification({ message: newClient.razao_social, subMessage: `Protocolo ${newClient.protocolo} atribuído a você.` });
             if ("Notification" in window && Notification.permission === "granted") {
-              new Notification(title, {
-                body: body,
-                icon: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png'
-              });
+              new Notification(`Nova Venda: ${newClient.razao_social}`, { body: `Protocolo ${newClient.protocolo} atribuído a você agora.` });
             }
-
-            try {
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-              audio.volume = 0.5;
-              audio.play().catch(() => {});
-            } catch (e) {}
-
+            try { new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {}); } catch (e) {}
             refreshData();
           }
-        }
-      )
+      })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [isConfigured, currentUser, refreshData]);
 
   const filteredData = useMemo(() => {
     if (!currentUser) return { clients: [], logs: [] };
-    if (currentUser.role === UserRole.MANAGER) {
-      return { clients, logs };
-    }
+    if (currentUser.role === UserRole.MANAGER) return { clients, logs };
     const userLogs = logs.filter(l => l.employeeId === currentUser.id);
     const clientIdsWithLogs = new Set(userLogs.map(l => l.clientId));
     const userClients = clients.filter(c => 
@@ -170,7 +139,7 @@ const App: React.FC = () => {
   if (view === 'LOGIN') return <LoginForm onLogin={handleLogin} branding={branding} />;
 
   return (
-    <div className="flex h-screen bg-gray-50 flex-col lg:flex-row overflow-hidden relative">
+    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
       {notification && (
         <NotificationToast 
           message={notification.message}
@@ -179,6 +148,7 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Sidebar fixo à esquerda no desktop */}
       <Sidebar 
         user={currentUser} 
         onLogout={handleLogout} 
@@ -189,29 +159,36 @@ const App: React.FC = () => {
         branding={branding}
       />
       
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex justify-between items-center z-40 shadow-sm">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+      {/* Container Principal - Adicionada margem à esquerda no desktop para acomodar o sidebar fixo */}
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-72 transition-all duration-300">
+        <header className="bg-white border-b border-gray-100 px-4 md:px-8 py-4 flex justify-between items-center z-[40] shadow-sm flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              className="lg:hidden p-2.5 -ml-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all active:scale-95"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <span className="hidden lg:block text-gray-400 text-xs font-black uppercase tracking-[0.25em]">Cloud Operations Center</span>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-blue-600 font-black uppercase tracking-[0.2em] leading-none mb-1">Status do Servidor</span>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-none">Cloud Operations Center Online</span>
+            </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            {loading && <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent mr-2"></div>}
+          <div className="flex items-center gap-4">
+            {loading && <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>}
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-black text-gray-800 leading-none">{currentUser?.name}</span>
-              <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1.5">{currentUser?.role === UserRole.MANAGER ? 'Manager' : 'Technical'}</span>
+              <span className="text-[9px] text-blue-600 font-black uppercase tracking-widest mt-1.5">{currentUser?.role === UserRole.MANAGER ? 'Master Admin' : 'Tech Analyst'}</span>
             </div>
-            <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-black border-2 border-white shadow-md text-sm">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black border-2 border-white shadow-lg text-sm uppercase ring-4 ring-blue-50">
               {currentUser?.name.charAt(0)}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-20 lg:pb-8">
-          <div className="max-w-6xl mx-auto">
+        <main className="flex-1 overflow-y-auto bg-gray-50/50 p-4 md:p-8">
+          <div className="max-w-6xl mx-auto pb-20">
             {view === 'DASHBOARD' && <Dashboard user={currentUser!} clients={filteredData.clients} logs={filteredData.logs} setView={setView} />}
             {view === 'CLIENT_REG' && <CustomerManagement user={currentUser!} onComplete={() => { refreshData(); setView('DASHBOARD'); }} />}
             {view === 'TRAINING_PURCHASE' && <TrainingPurchase user={currentUser!} onComplete={() => refreshData()} />}
