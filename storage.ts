@@ -3,8 +3,9 @@ import { User, Client, TrainingLog, UserRole, SystemModule, Customer, Integratio
 import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
 /**
- * Utilitários de Mapeamento (Mappers)
+ * Chaves para o LocalStorage (Branding)
  */
+const BRANDING_LOCAL_KEY = 'TM_BRANDING_DATA';
 
 const mapCustomerFromDB = (db: any): Customer => ({
   id: db.id,
@@ -62,7 +63,7 @@ const mapClientToDB = (client: Client) => {
 const mapLogFromDB = (db: any): TrainingLog => ({
   id: db.id,
   clientId: db.client_id,
-  numeroProtocolo: db.numero_protocolo || '', // MAPEAMENTO: Recebe do banco
+  numeroProtocolo: db.numero_protocolo || '',
   employeeId: db.employee_id,
   employeeName: db.employee_name,
   date: db.date,
@@ -85,7 +86,7 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
-  numero_protocolo: log.numeroProtocolo, // MAPEAMENTO: Envia para o banco
+  numero_protocolo: log.numeroProtocolo,
   employee_id: log.employeeId,
   employee_name: log.employeeName,
   date: log.date,
@@ -131,24 +132,10 @@ export const getStoredCustomers = async (): Promise<Customer[]> => {
   return (data || []).map(mapCustomerFromDB);
 };
 
-export const getCustomerByCnpj = async (cnpj: string): Promise<Customer | null> => {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('cnpj', cnpj)
-    .single();
-  
-  if (error && error.code !== 'PGRST116') throw error;
-  return data ? mapCustomerFromDB(data) : null;
-};
-
 export const saveCustomer = async (customer: Customer) => {
   const payload = mapCustomerToDB(customer);
   const { error } = await supabase.from('customers').insert([payload]);
-  if (error) {
-    console.error("Erro ao salvar cliente:", error.message || error);
-    throw error;
-  }
+  if (error) throw error;
 };
 
 export const updateCustomer = async (customer: Customer) => {
@@ -159,7 +146,6 @@ export const updateCustomer = async (customer: Customer) => {
 };
 
 export const deleteCustomer = async (id: string) => {
-  if (!id) throw new Error("ID do cliente não fornecido.");
   const client = getSupabase();
   const { error } = await client.from('customers').delete().eq('id', id);
   if (error) throw error;
@@ -173,45 +159,18 @@ export const getStoredClients = async (): Promise<Client[]> => {
   return (data || []).map(mapClientFromDB);
 };
 
-const performResilientClientOperation = async (payload: any, operation: 'insert' | 'update', id?: string) => {
-  let currentPayload = { ...payload };
-  
-  const tryOperation = async (p: any) => {
-    if (operation === 'insert') {
-      return await supabase.from('clients').insert([p]);
-    } else {
-      return await supabase.from('clients').update(p).eq('id', id);
-    }
-  };
-
-  let response = await tryOperation(currentPayload);
-
-  if (response.error && response.error.code === '42703') {
-    const errorMsg = response.error.message.toLowerCase();
-    if (errorMsg.includes('observacao')) {
-      delete currentPayload.observacao;
-      response = await tryOperation(currentPayload);
-    }
-    if (response.error && response.error.code === '42703' && errorMsg.includes('tipo_treinamento')) {
-      const value = currentPayload.tipo_treinamento;
-      delete currentPayload.tipo_treinamento;
-      currentPayload.tipo_tre_namento = value;
-      response = await tryOperation(currentPayload);
-    }
-  }
-
-  if (response.error) throw response.error;
-  return true;
-};
-
 export const saveClient = async (client: Client) => {
   const payload = mapClientToDB(client);
-  return await performResilientClientOperation(payload, 'insert');
+  const { error } = await supabase.from('clients').insert([payload]);
+  if (error) throw error;
+  return true;
 };
 
 export const updateClient = async (client: Client) => {
   const payload = mapClientToDB(client);
-  return await performResilientClientOperation(payload, 'update', client.id);
+  const { error } = await supabase.from('clients').update(payload).eq('id', client.id);
+  if (error) throw error;
+  return true;
 };
 
 export const deleteClient = async (clientId: string) => {
@@ -223,9 +182,7 @@ export const deleteClient = async (clientId: string) => {
 
 export const updateClientStatus = async (clientId: string, status: 'pending' | 'completed', dataFim: string | null = null, residualHours: number | null = null) => {
   const updateData: any = { status, data_fim: dataFim };
-  if (residualHours !== null) {
-    updateData.residual_hours_added = residualHours;
-  }
+  if (residualHours !== null) updateData.residual_hours_added = residualHours;
   const { error } = await supabase.from('clients').update(updateData).eq('id', clientId);
   if (error) throw error;
   return true;
@@ -310,7 +267,7 @@ export const deleteTrainingType = async (id: string) => {
   if (error) throw error;
 };
 
-// --- INTEGRATIONS & CLOUD CONFIG ---
+// --- INTEGRATIONS ---
 export const getStoredIntegrations = async (): Promise<IntegrationSettings> => {
   const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
   if (error && error.code !== 'PGRST116') throw error;
@@ -327,28 +284,32 @@ export const saveIntegrations = async (settings: IntegrationSettings) => {
   if (error) throw error;
 };
 
-// --- BRANDING ---
+// --- BRANDING (RESILIENTE) ---
 export const getStoredBranding = async (): Promise<BrandingConfig> => {
-  const { data, error } = await supabase.from('integrations').select('*').eq('id', 3).single();
-  if (error && error.code !== 'PGRST116') throw error;
-  
-  if (data) {
+  // 1. Tentar LocalStorage primeiro (Rápido e garantido no browser atual)
+  const local = localStorage.getItem(BRANDING_LOCAL_KEY);
+  if (local) {
     try {
+      return JSON.parse(local);
+    } catch (e) {}
+  }
+
+  // 2. Fallback para o Supabase (Sincronização entre browsers)
+  try {
+    const { data, error } = await supabase.from('integrations').select('*').eq('id', 3).single();
+    if (!error && data) {
       const config = JSON.parse(data.webhook_url);
-      return {
+      const branding = {
         appName: data.api_key || 'TrainMaster',
         appSubtitle: config.subtitle || 'SISTEMA PRO',
         logoUrl: config.logoUrl || ''
       };
-    } catch {
-       return {
-        appName: data.api_key || 'TrainMaster',
-        appSubtitle: 'SISTEMA PRO',
-        logoUrl: data.webhook_url || ''
-      };
+      // Atualiza o local com o que veio da nuvem
+      localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(branding));
+      return branding;
     }
-  }
-  
+  } catch (e) {}
+
   return {
     appName: 'TrainMaster',
     appSubtitle: 'SISTEMA PRO',
@@ -357,42 +318,47 @@ export const getStoredBranding = async (): Promise<BrandingConfig> => {
 };
 
 export const saveBranding = async (config: BrandingConfig) => {
-  const jsonConfig = JSON.stringify({ 
-    subtitle: config.appSubtitle, 
-    logoUrl: config.logoUrl 
-  });
-  
-  const { error } = await supabase.from('integrations').upsert({ 
-    id: 3, 
-    api_key: config.appName, 
-    webhook_url: jsonConfig,
-    updated_at: new Date().toISOString() 
-  });
-  if (error) throw error;
+  // 1. Salva no LocalStorage IMEDIATAMENTE
+  localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(config));
+
+  // 2. Tenta salvar no Supabase (Opcional, se a tabela permitir ID 3)
+  try {
+    const jsonConfig = JSON.stringify({ 
+      subtitle: config.appSubtitle, 
+      logoUrl: config.logoUrl 
+    });
+    
+    const { error } = await supabase.from('integrations').upsert({ 
+      id: 3, 
+      api_key: config.appName, 
+      webhook_url: jsonConfig,
+      updated_at: new Date().toISOString() 
+    });
+    
+    if (error) {
+      // Se for erro de restrição de ID (CHECK CONSTRAINT), ignoramos silenciosamente
+      // pois o localStorage já garantiu a persistência no browser.
+      if (error.code === '23514') {
+        console.warn("Sincronização cloud de branding ignorada devido a restrição de ID no banco.");
+        return true;
+      }
+      throw error;
+    }
+  } catch (err) {
+    console.error("Falha ao sincronizar branding com cloud, mantendo local.");
+  }
+  return true;
 };
 
-/**
- * Tenta gravar as credenciais do Supabase no banco de dados (ID 2).
- */
 export const saveCloudConfigToDB = async (url: string, key: string) => {
   try {
     resetSupabaseClient();
     const client = getSupabase();
-    const { error } = await client.from('integrations').upsert({
+    await client.from('integrations').upsert({
       id: 2,
       api_key: key,
       webhook_url: url,
       updated_at: new Date().toISOString()
     });
-    
-    if (error) {
-      if (error.code === '23514') {
-        console.warn("Aviso: Restrição de banco impede salvamento ID 2 (Check Constraint).");
-        return;
-      }
-      throw error;
-    }
-  } catch (err: any) {
-    console.error("Erro ao persistir chaves no banco ID 2:", err.message || err);
-  }
+  } catch (err) {}
 };
