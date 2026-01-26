@@ -3,10 +3,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Registro do Service Worker para PWA com escopo raiz
+// Registro do Service Worker para PWA com caminho relativo para evitar erros de origem
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    // Usamos './sw.js' em vez de '/sw.js' para garantir que o script seja buscado no diretório atual
+    navigator.serviceWorker.register('./sw.js')
       .then(reg => {
         console.log('Service Worker registrado com sucesso no escopo:', reg.scope);
       })
