@@ -119,6 +119,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           apiKey: settings.apiKey,
           razao_social: selectedCustomer?.razãoSocial,
           cnpj: selectedCustomer?.cnpj,
+          ref_movidesk: selectedCustomer?.refMovidesk || '', // ENVIANDO O REF MOVIDESK PARA O WEBHOOK
           modulos: formData.modulos,
           tipo_treinamento: formData.tipoTreinamento,
           responsavel: formData.responsavelTecnico,
