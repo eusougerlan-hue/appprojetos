@@ -20,6 +20,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
   const [formData, setFormData] = useState({
     razãoSocial: '',
     cnpj: '',
+    refMovidesk: '',
     contacts: [] as Contact[]
   });
 
@@ -61,6 +62,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
         id: editingCustomer ? editingCustomer.id : '',
         razãoSocial: formData.razãoSocial.trim(),
         cnpj: formData.cnpj.trim(),
+        refMovidesk: formData.refMovidesk.trim(),
         contacts: formData.contacts
       };
 
@@ -87,6 +89,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
     setFormData({
       razãoSocial: customer.razãoSocial,
       cnpj: customer.cnpj,
+      refMovidesk: customer.refMovidesk || '',
       contacts: customer.contacts || []
     });
     setViewMode('form');
@@ -95,7 +98,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
   const resetForm = () => {
     setEditingCustomer(null);
     setConfirmDeleteId(null);
-    setFormData({ razãoSocial: '', cnpj: '', contacts: [] });
+    setFormData({ razãoSocial: '', cnpj: '', refMovidesk: '', contacts: [] });
   };
 
   const performDelete = async (id: string) => {
@@ -258,9 +261,13 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Razão Social</label>
             <input type="text" className="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10" value={formData.razãoSocial} onChange={e => setFormData({...formData, razãoSocial: e.target.value})} placeholder="Ex: Empresa de Software LTDA" required disabled={loading} />
           </div>
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">CNPJ</label>
             <input type="text" className="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10" value={formData.cnpj} onChange={e => setFormData({...formData, cnpj: e.target.value})} placeholder="00.000.000/0000-00" required disabled={loading} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1 text-blue-500">Ref. Movidesk</label>
+            <input type="text" className="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-blue-600 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10" value={formData.refMovidesk} onChange={e => setFormData({...formData, refMovidesk: e.target.value})} placeholder="ID Movidesk" disabled={loading} />
           </div>
         </div>
 

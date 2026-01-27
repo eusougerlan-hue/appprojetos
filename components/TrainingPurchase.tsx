@@ -68,10 +68,6 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     loadData();
   }, [viewMode]);
 
-  const activeUsers = useMemo(() => {
-    return allUsers.filter(u => u.active !== false);
-  }, [allUsers]);
-
   const visibleClients = useMemo(() => {
     let list = [...allClients];
     if (user.role !== UserRole.MANAGER) {
@@ -110,7 +106,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     
     let finalProtocol = formData.protocolo;
 
-    // FLUXO: Se não tem protocolo ou é nova venda, gera no Movidesk ANTES de salvar no banco
+    // ETAPA 1: GERAÇÃO DE PROTOCOLO VIA N8N
     if (!editingId || !formData.protocolo) {
       if (!settings.webhookUrl) {
         return alert('ERRO: Configure o Webhook do n8n nas Integrações Cloud para gerar protocolos Movidesk.');
@@ -138,16 +134,20 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           body: JSON.stringify(payload)
         });
 
-        if (!response.ok) throw new Error(`Status ${response.status} no Webhook`);
+        if (!response.ok) {
+           const errorBody = await response.text();
+           console.error('Erro n8n:', errorBody);
+           throw new Error(`O n8n retornou erro ${response.status}. Certifique-se de que o workflow n8n está apenas devolvendo o protocolo.`);
+        }
         
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = Array.isArray(rawData) ? rawData[0] : rawData;
         
-        // Aqui recebemos o número (Ex: 202601004476) e salvamos na variável local
         if (data && data.protocolo) {
           finalProtocol = data.protocolo;
           setFormData(prev => ({ ...prev, protocolo: data.protocolo }));
         } else {
-          throw new Error('O Movidesk não retornou um número de protocolo válido no campo "protocolo".');
+          throw new Error('O n8n não retornou a chave "protocolo". Verifique o formato de resposta do n8n.');
         }
       } catch (err: any) {
         setGeneratingProtocol(false);
@@ -155,6 +155,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       }
     }
 
+    // ETAPA 2: SALVAMENTO NO SUPABASE (Sincronizado)
     setLoading(true);
     setGeneratingProtocol(false);
 
@@ -163,7 +164,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         id: editingId || Math.random().toString(36).substr(2, 9), 
         customerId: formData.customerId,
         razãoSocial: selectedCustomer?.razãoSocial || '',
-        protocolo: finalProtocol, // O protocolo recebido entra aqui para ser salvo no Supabase
+        protocolo: finalProtocol, 
         modulos: formData.modulos,
         tipoTreinamento: formData.tipoTreinamento,
         duracaoHoras: Number(formData.duracaoHoras),
@@ -185,7 +186,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       setViewMode('list');
       onComplete(); 
     } catch (err: any) {
-      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message || 'Falha na persistência.'}`);
+      console.error('Erro ao salvar no Supabase:', err);
+      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message || 'Verifique se a coluna tipo_treinamento existe no banco.'}`);
     } finally {
       setLoading(false);
     }
@@ -194,7 +196,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const performDelete = async (id: string) => {
     const client = allClients.find(c => c.id === id);
     if (client?.status === 'completed') {
-      alert('SEGURANÇA: Projetos FINALIZADOS não podem ser excluídos para manter integridade dos relatórios.');
+      alert('SEGURANÇA: Projetos FINALIZADOS não podem ser excluídos.');
       setConfirmDeleteId(null);
       return;
     }
@@ -335,16 +337,15 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
   return (
     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp max-w-4xl mx-auto overflow-hidden relative">
-        {/* OVERLAY DE CARREGAMENTO / GERAÇÃO - Bloqueia interação enquanto espera o n8n */}
         {(generatingProtocol || loading) && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center animate-fadeIn">
             <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"></div>
             <div className="text-center">
                <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">
-                 {generatingProtocol ? 'Gerando Protocolo Movidesk...' : 'Salvando Venda...'}
+                 {generatingProtocol ? 'Sincronizando com Movidesk via n8n...' : 'Persistindo dados no Supabase...'}
                </h3>
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-                 Aguarde a sincronização com o Cloud Center
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] px-10 leading-relaxed">
+                 Aguarde a geração do protocolo e o salvamento automático.
                </p>
             </div>
           </div>
@@ -366,7 +367,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="md:col-span-2">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Cliente Beneficiário</label>
-                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-slate-50/50 transition-all disabled:opacity-50" value={formData.customerId} onChange={e => handleCustomerChange(e.target.value)} required disabled={isViewOnly || !!editingId}>
+                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/50 transition-all disabled:opacity-50" value={formData.customerId} onChange={e => handleCustomerChange(e.target.value)} required disabled={isViewOnly || !!editingId}>
                   <option value="">Selecione o cliente da base...</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.razãoSocial}</option>)}
                 </select>
@@ -379,7 +380,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Tipo de Treinamento</label>
-                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-slate-50/50 transition-all" value={formData.tipoTreinamento} onChange={e => setFormData({...formData, tipoTreinamento: e.target.value})} required disabled={isViewOnly}>
+                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/50 transition-all" value={formData.tipoTreinamento} onChange={e => setFormData({...formData, tipoTreinamento: e.target.value})} required disabled={isViewOnly}>
                     {availableTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                 </select>
               </div>
@@ -401,15 +402,15 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-50">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Carga Horária (h)</label>
-                    <input type="number" step="0.5" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-700 bg-slate-50/50" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly} />
+                    <input type="number" step="0.5" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Valor Contrato (R$)</label>
-                    <input type="number" step="0.01" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-700 bg-slate-50/50" value={formData.valorImplantacao} onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} required disabled={isViewOnly} />
+                    <input type="number" step="0.01" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.valorImplantacao} onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Comissão (%)</label>
-                    <input type="number" step="1" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-700 bg-slate-50/50" value={formData.comissaoPercent} onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} required disabled={isViewOnly} />
+                    <input type="number" step="1" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.comissaoPercent} onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
               </div>
 

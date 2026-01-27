@@ -41,6 +41,7 @@ export interface Customer {
   id: string;
   razãoSocial: string;
   cnpj: string;
+  refMovidesk?: string;
   contacts?: Contact[];
 }
 

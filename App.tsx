@@ -48,15 +48,82 @@ const App: React.FC = () => {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
-  const [branding, setBranding] = useState<BrandingConfig>({
-    appName: 'TrainMaster',
-    appSubtitle: 'SISTEMA PRO',
-    logoUrl: ''
+  const [branding, setBranding] = useState<BrandingConfig>(() => {
+    const cached = localStorage.getItem('TM_BRANDING_DATA');
+    if (cached) {
+      try { return JSON.parse(cached); } catch (e) {}
+    }
+    return {
+      appName: 'TrainMaster',
+      appSubtitle: 'SISTEMA PRO',
+      logoUrl: ''
+    };
   });
+  
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
   const [loading, setLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
+
+  // Efeito para sincronizar PWA (Manifesto, Ícone, Título) com a marca
+  useEffect(() => {
+    const { appName, appSubtitle, logoUrl } = branding;
+    const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png';
+    const iconUrl = logoUrl || defaultIcon;
+    const fullDescription = `${appName} - ${appSubtitle}`;
+
+    // 1. Atualizar Título e Meta Descrição
+    document.title = `${appName} | ${appSubtitle}`;
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', fullDescription);
+
+    // 2. Atualizar Favicons
+    const favicon = document.getElementById('dynamic-favicon') as HTMLLinkElement;
+    const appleIcon = document.getElementById('dynamic-apple-icon') as HTMLLinkElement;
+    if (favicon) favicon.href = iconUrl;
+    if (appleIcon) appleIcon.href = iconUrl;
+
+    // 3. Gerar Manifesto Dinâmico
+    const manifest = {
+      name: appName,
+      short_name: appName,
+      description: fullDescription,
+      start_url: "./",
+      display: "standalone",
+      background_color: "#f8fafc",
+      theme_color: "#2563eb",
+      orientation: "portrait",
+      icons: [
+        {
+          src: iconUrl,
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any maskable"
+        },
+        {
+          src: iconUrl,
+          sizes: "192x192",
+          type: "image/png"
+        }
+      ]
+    };
+
+    const stringManifest = JSON.stringify(manifest);
+    const blob = new Blob([stringManifest], { type: 'application/json' });
+    const manifestUrl = URL.createObjectURL(blob);
+    
+    const manifestTag = document.getElementById('dynamic-manifest') as HTMLLinkElement;
+    if (manifestTag) {
+      manifestTag.href = manifestUrl;
+    }
+
+    return () => URL.revokeObjectURL(manifestUrl);
+  }, [branding]);
 
   useEffect(() => {
     if (window.location.search && currentUser) {

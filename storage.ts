@@ -13,12 +13,14 @@ const mapCustomerFromDB = (db: any): Customer => ({
   id: db.id,
   razãoSocial: db.razao_social,
   cnpj: db.cnpj,
+  refMovidesk: db.ref_movidesk || '',
   contacts: db.contacts || []
 });
 
 const mapCustomerToDB = (customer: Customer) => ({
   razao_social: customer.razãoSocial,
   cnpj: customer.cnpj,
+  ref_movidesk: customer.refMovidesk || '',
   contacts: customer.contacts || []
 });
 
