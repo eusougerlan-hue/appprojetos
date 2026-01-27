@@ -16,6 +16,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [formData, setFormData] = useState({
     razãoSocial: '',
@@ -45,6 +46,15 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
       fetchData();
     }
   }, [viewMode]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!searchTerm.trim()) return customers;
+    const term = searchTerm.toLowerCase();
+    return customers.filter(c => 
+      c.razãoSocial.toLowerCase().includes(term) || 
+      c.cnpj.toLowerCase().includes(term)
+    );
+  }, [customers, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,21 +161,37 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
 
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 animate-fadeIn overflow-hidden">
+        <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white sticky top-0 z-10">
           <div>
             <h2 className="text-xl font-black text-gray-800 tracking-tight">Base de Clientes</h2>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Sincronizado via Supabase Cloud</p>
           </div>
-          <button 
-            onClick={() => { resetForm(); setViewMode('form'); }} 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-100 active:scale-95 flex items-center gap-2 uppercase tracking-wider"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
-            </svg>
-            Novo Cliente
-          </button>
+          
+          <div className="flex flex-1 items-center justify-end gap-3 w-full md:w-auto">
+            <div className="relative flex-1 max-w-sm">
+              <input 
+                type="text" 
+                placeholder="Buscar Cliente" 
+                className="w-full px-5 py-3 rounded-2xl border border-blue-200 outline-none font-bold text-blue-600 bg-gray-50/50 transition-all focus:ring-4 focus:ring-blue-500/10 placeholder:text-blue-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <svg className="w-5 h-5 text-blue-300 absolute right-4 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            
+            <button 
+              onClick={() => { resetForm(); setViewMode('form'); }} 
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-[11px] font-black transition-all shadow-xl shadow-blue-100 active:scale-95 flex items-center gap-2 uppercase tracking-widest flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
+              </svg>
+              Novo Cliente
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto min-h-[300px]">
@@ -177,41 +203,41 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
             <table className="w-full text-left">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Razão Social</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">CNPJ</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Contatos</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Razão Social</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">CNPJ</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Contatos</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {customers.length === 0 ? (
+                {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-16 text-center">
-                      <p className="text-gray-400 font-bold text-sm">Nenhum cliente cadastrado.</p>
+                    <td colSpan={4} className="px-8 py-16 text-center">
+                      <p className="text-gray-400 font-bold text-sm italic">Nenhum cliente encontrado.</p>
                     </td>
                   </tr>
                 ) : (
-                  customers.map((customer) => {
+                  filteredCustomers.map((customer) => {
                     const linkedPurchasesCount = allClients.filter(c => c.customerId === customer.id).length;
                     
                     return (
                       <tr key={customer.id} className="hover:bg-blue-50/30 transition-colors group">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-gray-800 text-sm">{customer.razãoSocial}</p>
+                        <td className="px-8 py-5">
+                          <p className="font-black text-slate-700 text-sm leading-tight">{customer.razãoSocial}</p>
                           {linkedPurchasesCount > 0 && (
-                            <span className="text-[9px] font-black bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">
-                              {linkedPurchasesCount} Contratos Ativos
+                            <span className="text-[9px] font-black bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md uppercase tracking-tighter mt-1 inline-block">
+                              {linkedPurchasesCount} {linkedPurchasesCount === 1 ? 'Contrato Ativo' : 'Contratos Ativos'}
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-xs text-gray-500 font-medium">{customer.cnpj}</td>
-                        <td className="px-6 py-4">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-black border border-blue-100">
+                        <td className="px-8 py-5 text-xs text-gray-500 font-medium">{customer.cnpj}</td>
+                        <td className="px-8 py-5 text-center">
+                          <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black border border-blue-100 uppercase">
                             {customer.contacts?.length || 0} CONTATOS
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2 items-center">
+                        <td className="px-8 py-5 text-right">
+                          <div className="flex justify-end gap-1 items-center">
                             {actionLoadingId === customer.id ? (
                               <div className="p-2 animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
                             ) : confirmDeleteId === customer.id ? (
@@ -221,10 +247,10 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
                               </div>
                             ) : (
                               <>
-                                <button onClick={() => handleEdit(customer)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar cliente">
+                                <button onClick={() => handleEdit(customer)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Editar cliente">
                                   <svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                 </button>
-                                <button onClick={() => setConfirmDeleteId(customer.id)} className={`p-2 rounded-lg transition-all ${linkedPurchasesCount > 0 ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`} title={linkedPurchasesCount > 0 ? "Bloqueado" : "Excluir"}>
+                                <button onClick={() => setConfirmDeleteId(customer.id)} className={`p-2 rounded-xl transition-all ${linkedPurchasesCount > 0 ? 'text-gray-200 cursor-not-allowed' : 'text-red-400 hover:bg-red-50'}`} title={linkedPurchasesCount > 0 ? "Bloqueado" : "Excluir"}>
                                   <svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
                               </>
@@ -271,7 +297,6 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
           </div>
         </div>
 
-        {/* Seção de Contatos Restaurada */}
         <div className="space-y-4 pt-4 border-t border-gray-100">
            <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
