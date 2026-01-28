@@ -70,88 +70,82 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
         <p className="text-sm text-gray-500 font-medium">Bem-vindo ao painel de controle de treinamentos.</p>
       </header>
 
-      {/* Grid de Cartões - 2 colunas no mobile, compactos */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+      {/* Grid de Cartões - Agora com 3 colunas fixas desde o mobile */}
+      <div className="grid grid-cols-3 gap-2 md:gap-6">
         {/* Card Clientes */}
-        <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 md:w-11 md:h-11 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        <div className="bg-white p-2 md:p-5 rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
+            <div className="w-7 h-7 md:w-11 md:h-11 bg-blue-50 text-blue-600 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             </div>
-            <div className="flex flex-col">
-              <h3 className="text-blue-600 text-sm md:text-base font-black leading-none">Clientes</h3>
-            </div>
+            <h3 className="text-blue-600 text-[10px] md:text-base font-black leading-none truncate">Clientes</h3>
           </div>
-          <p className="text-2xl md:text-4xl font-black text-gray-800 mt-4 md:mt-6 leading-none">{clients.length}</p>
+          <p className="text-xl md:text-4xl font-black text-gray-800 mt-2 md:mt-6 leading-none">{clients.length}</p>
         </div>
 
         {/* Card Pendentes */}
-        <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 md:w-11 md:h-11 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <div className="bg-white p-2 md:p-5 rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
+            <div className="w-7 h-7 md:w-11 md:h-11 bg-orange-50 text-orange-600 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <div className="flex flex-col">
-              <h3 className="text-blue-600 text-sm md:text-base font-black leading-none">Pendentes</h3>
-            </div>
+            <h3 className="text-blue-600 text-[10px] md:text-base font-black leading-none truncate">Pendentes</h3>
           </div>
-          <p className="text-2xl md:text-4xl font-black text-gray-800 mt-4 md:mt-6 leading-none">{pendingCount}</p>
+          <p className="text-xl md:text-4xl font-black text-gray-800 mt-2 md:mt-6 leading-none">{pendingCount}</p>
         </div>
 
         {/* Card Realizados */}
-        <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between col-span-2 md:col-span-1 hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 md:w-11 md:h-11 bg-green-50 text-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <div className="bg-white p-2 md:p-5 rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
+            <div className="w-7 h-7 md:w-11 md:h-11 bg-green-50 text-green-600 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <div className="flex flex-col">
-              <h3 className="text-blue-600 text-sm md:text-base font-black leading-none">Realizados</h3>
-            </div>
+            <h3 className="text-blue-600 text-[10px] md:text-base font-black leading-none truncate">Realizados</h3>
           </div>
-          <p className="text-2xl md:text-4xl font-black text-gray-800 mt-4 md:mt-6 leading-none">{completedCount}</p>
+          <p className="text-xl md:text-4xl font-black text-gray-800 mt-2 md:mt-6 leading-none">{completedCount}</p>
         </div>
       </div>
 
       {isManager && (
-        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mt-8 animate-slideUp">
-          <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mt-8 animate-slideUp">
+          <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div>
-              <h3 className="font-black text-gray-800 flex items-center gap-2 text-sm">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <h3 className="font-black text-gray-800 flex items-center gap-2 text-xs md:text-sm">
+                <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 Produtividade da Equipe
               </h3>
-              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Métricas de {monthName} de {currentYear}</p>
+              <p className="text-[8px] md:text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Métricas de {monthName} de {currentYear}</p>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50/30">
                 <tr>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">Técnico Responsável</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Pendentes</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Finalizados</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Sessões</th>
+                  <th className="px-4 md:px-6 py-3 md:py-4 text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest">Técnico</th>
+                  <th className="px-4 md:px-6 py-3 md:py-4 text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Pend.</th>
+                  <th className="px-4 md:px-6 py-3 md:py-4 text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Fin.</th>
+                  <th className="px-4 md:px-6 py-3 md:py-4 text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Sessões</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {techProductivity.map((tech) => (
                   <tr key={tech.name} className="hover:bg-blue-50/20 transition-colors">
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-[10px]">
+                    <td className="px-4 md:px-6 py-2 md:py-3">
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-[8px] md:text-[10px]">
                           {tech.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-gray-700 text-xs">{tech.name}</span>
+                        <span className="font-bold text-gray-700 text-[10px] md:text-xs truncate max-w-[80px] md:max-w-none">{tech.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-3 text-center">
-                      <span className="text-xs font-bold text-gray-400">{tech.pending}</span>
+                    <td className="px-4 md:px-6 py-2 md:py-3 text-center">
+                      <span className="text-[10px] md:text-xs font-bold text-gray-400">{tech.pending}</span>
                     </td>
-                    <td className="px-6 py-3 text-center">
-                      <span className="text-xs font-bold text-gray-400">0</span>
+                    <td className="px-4 md:px-6 py-2 md:py-3 text-center">
+                      <span className="text-[10px] md:text-xs font-bold text-gray-400">0</span>
                     </td>
-                    <td className="px-6 py-3 text-center">
-                      <span className="text-sm font-black text-blue-600">{tech.sessions}</span>
+                    <td className="px-4 md:px-6 py-2 md:py-3 text-center">
+                      <span className="text-[11px] md:text-sm font-black text-blue-600">{tech.sessions}</span>
                     </td>
                   </tr>
                 ))}
