@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Client, TrainingLog, User, UserRole, Contact } from '../types';
-import { updateClientStatus, getStoredIntegrations, getStoredUsers } from '../storage';
+import { Client, TrainingLog, User, UserRole, Contact, Customer } from '../types';
+import { updateClientStatus, getStoredIntegrations, getStoredUsers, getStoredCustomers } from '../storage';
 
 interface HoursManagementProps {
   clients: Client[];
@@ -20,6 +20,8 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [allTechnicians, setAllTechnicians] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   
   // Estados para o fluxo de modais
   const [activeClient, setActiveClient] = useState<Client | null>(null);
@@ -27,11 +29,18 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
   const [finalizeMessage, setFinalizeMessage] = useState('');
 
   useEffect(() => {
-    const fetchTechs = async () => {
+    const fetchData = async () => {
+      const [storedUsers, storedCustomers] = await Promise.all([
+        getStoredUsers(),
+        getStoredCustomers()
+      ]);
+      
+      setAllUsers(storedUsers);
+      setCustomers(storedCustomers);
+
       if (!isManager) {
         setSelectedTechs([user.name]);
       } else {
-        const storedUsers = await getStoredUsers();
         const techNames = Array.from(new Set([
           ...storedUsers.map(u => u.name),
           ...clients.map(c => c.responsavelTecnico)
@@ -39,7 +48,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
         setAllTechnicians(techNames);
       }
     };
-    fetchTechs();
+    fetchData();
   }, [clients, isManager, user.name]);
 
   const getUsedHours = (clientId: string) => {
@@ -56,7 +65,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
     return client.responsavelTecnico || 'Não identificado';
   };
 
-  const triggerFinalizeWebhook = async (client: Client, usedHours: number, balance: number, technician: string, message: string) => {
+  const triggerFinalizeWebhook = async (client: Client, usedHours: number, balance: number, technicianName: string, message: string) => {
     const settings = await getStoredIntegrations();
     if (!settings.webhookUrl) return;
 
@@ -70,6 +79,12 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
       }
     });
     const participantes = Array.from(participantsMap.values());
+    
+    // Busca o refMovidesk do cliente base
+    const customer = customers.find(c => c.id === client.customerId);
+    
+    // Busca o usuarioMovidesk do técnico responsável pelo nome
+    const technicianUser = allUsers.find(u => u.name === technicianName);
 
     try {
       const payload = {
@@ -77,11 +92,13 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
         apiKey: settings.apiKey,
         protocolo: client.protocolo,
         razao_social: client.razãoSocial,
+        ref_movidesk: customer?.refMovidesk || '', 
+        usuario_movidesk: technicianUser?.usuarioMovidesk || '', // ENVIANDO O USUÁRIO MOVIDESK DO TÉCNICO
         tipo_treinamento: client.tipoTreinamento,
         horas_contratadas: client.duracaoHoras,
         horas_utilizadas: Number(usedHours.toFixed(1)),
         saldo_restante: Number(balance.toFixed(1)),
-        responsavel_tecnico: technician,
+        responsavel_tecnico: technicianName,
         finalizado_por: user.name,
         mensagem_finalizacao: message,
         participantes: participantes.map(p => ({
@@ -291,7 +308,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
             </button>
             <button
               onClick={() => setStatusFilter('PENDING')}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === 'PENDING' ? 'bg-orange-500 text-white shadow-md shadow-orange-100' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === 'PENDING' ? 'bg-orange-50 text-white shadow-md shadow-orange-100' : 'text-gray-400 hover:text-gray-600'}`}
             >
               Pendente
             </button>

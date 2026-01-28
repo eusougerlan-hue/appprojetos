@@ -20,7 +20,8 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
     cpf: '',
     password: '',
     role: UserRole.EMPLOYEE,
-    active: true
+    active: true,
+    usuarioMovidesk: ''
   });
 
   const fetchUsers = async () => {
@@ -50,7 +51,8 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
       cpf: user.cpf,
       password: user.password || '',
       role: user.role,
-      active: user.active !== false
+      active: user.active !== false,
+      usuarioMovidesk: user.usuarioMovidesk || ''
     });
     setViewMode('form');
   };
@@ -73,7 +75,8 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
       cpf: '',
       password: '',
       role: UserRole.EMPLOYEE,
-      active: true
+      active: true,
+      usuarioMovidesk: ''
     });
     setViewMode('form');
   };
@@ -92,7 +95,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
       } else {
         const newUser: User = {
           ...formData,
-          id: Math.random().toString(36).substr(2, 9), // Supabase gera UUID, mas mantemos o ID enviado se necessário
+          id: Math.random().toString(36).substr(2, 9),
         };
         await saveUser(newUser);
       }
@@ -195,39 +198,40 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-slideIn max-w-2xl mx-auto">
-      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-slideIn max-w-2xl mx-auto overflow-hidden">
+      <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">
+          <h2 className="text-xl font-bold text-gray-800 tracking-tight">
             {editingUser ? 'Editar Funcionário' : 'Cadastrar Novo Funcionário'}
           </h2>
-          <p className="text-sm text-gray-500">Sincronizado com Supabase.</p>
+          <p className="text-sm text-gray-500 font-medium">Sincronizado com Supabase.</p>
         </div>
-        <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+        <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100 shadow-sm">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 01-8 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 01-8 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
       </div>
       
-      <form onSubmit={handleSubmit} className="p-6 space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nome Completo</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nome Completo</label>
             <input
               type="text"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
               required
               disabled={loading}
+              placeholder="Nome do colaborador"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">E-mail Corporativo</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">E-mail Corporativo</label>
             <input
               type="email"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               placeholder="exemplo@empresa.com"
@@ -237,12 +241,12 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Telefone</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Telefone</label>
             <input
               type="text"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value})}
               placeholder="(00) 00000-0000"
@@ -251,10 +255,10 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">CPF (Login)</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">CPF (Login)</label>
             <input
               type="text"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
               value={formData.cpf}
               onChange={(e) => setFormData({...formData, cpf: e.target.value})}
               placeholder="000.000.000-00"
@@ -264,12 +268,12 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Senha {editingUser ? '(Opcional)' : 'Provisória'}</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Senha {editingUser ? '(Opcional)' : 'Provisória'}</label>
             <input
               type="password"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               required={!editingUser}
@@ -278,9 +282,36 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cargo</label>
+            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 ml-1">Usuário Movidesk</label>
+            <input
+              type="text"
+              className="w-full px-5 py-3 rounded-xl border border-blue-100 focus:border-blue-500 outline-none font-bold text-blue-600 bg-blue-50/10 transition-all focus:ring-4 focus:ring-blue-500/10"
+              value={formData.usuarioMovidesk}
+              onChange={(e) => setFormData({...formData, usuarioMovidesk: e.target.value})}
+              placeholder="Usuário Movidesk"
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-2">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="user-active"
+              checked={formData.active}
+              onChange={(e) => setFormData({...formData, active: e.target.checked})}
+              className="w-6 h-6 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500 cursor-pointer transition-all"
+              disabled={loading}
+            />
+            <label htmlFor="user-active" className="text-sm font-bold text-gray-700 cursor-pointer select-none">
+              Usuário Ativo
+            </label>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Cargo</label>
             <select
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all"
               value={formData.role}
               onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})}
               disabled={loading}
@@ -291,25 +322,11 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           </div>
         </div>
 
-        <div className="flex items-center gap-3 py-2">
-          <input
-            type="checkbox"
-            id="user-active"
-            checked={formData.active}
-            onChange={(e) => setFormData({...formData, active: e.target.checked})}
-            className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-            disabled={loading}
-          />
-          <label htmlFor="user-active" className="text-sm font-semibold text-gray-700 cursor-pointer">
-            Usuário Ativo
-          </label>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4">
+        <div className="flex justify-end gap-3 pt-8 border-t border-gray-100">
           <button
             type="button"
             onClick={() => setViewMode('list')}
-            className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+            className="px-6 py-3 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-gray-600 transition-all rounded-xl"
             disabled={loading}
           >
             Voltar para Lista
@@ -317,8 +334,8 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           <button
             type="submit"
             disabled={loading}
-            className={`px-8 py-2.5 rounded-lg shadow-md transition-all font-bold text-white flex items-center justify-center min-w-[160px] ${
-              editingUser ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'
+            className={`px-10 py-3 rounded-xl shadow-xl transition-all font-black text-[10px] uppercase tracking-widest text-white flex items-center justify-center min-w-[180px] active:scale-95 ${
+              editingUser ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
             }`}
           >
             {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : (editingUser ? 'Salvar Alterações' : 'Cadastrar Funcionário')}

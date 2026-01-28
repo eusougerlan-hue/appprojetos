@@ -9,6 +9,29 @@ const BRANDING_LOCAL_KEY = 'TM_BRANDING_DATA';
 const SUPABASE_URL_KEY = 'SUPABASE_URL';
 const SUPABASE_KEY_KEY = 'SUPABASE_ANON_KEY';
 
+const mapUserFromDB = (db: any): User => ({
+  id: db.id,
+  name: db.name,
+  phone: db.phone,
+  email: db.email,
+  cpf: db.cpf,
+  password: db.password,
+  role: db.role,
+  active: db.active,
+  usuarioMovidesk: db.usuario_movidesk || ''
+});
+
+const mapUserToDB = (user: User) => ({
+  name: user.name,
+  phone: user.phone,
+  email: user.email,
+  cpf: user.cpf,
+  password: user.password,
+  role: user.role,
+  active: user.active !== false,
+  usuario_movidesk: user.usuarioMovidesk || ''
+});
+
 const mapCustomerFromDB = (db: any): Customer => ({
   id: db.id,
   razãoSocial: db.razao_social,
@@ -114,17 +137,18 @@ const mapLogToDB = (log: TrainingLog) => ({
 export const getStoredUsers = async (): Promise<User[]> => {
   const { data, error } = await supabase.from('users').select('*').order('name');
   if (error) throw error;
-  return data || [];
+  return (data || []).map(mapUserFromDB);
 };
 
 export const saveUser = async (user: User) => {
-  const { id, ...data } = user;
+  const data = mapUserToDB(user);
   const { error } = await supabase.from('users').insert([data]);
   if (error) throw error;
 };
 
 export const updateUser = async (user: User) => {
-  const { error } = await supabase.from('users').update(user).eq('id', user.id);
+  const data = mapUserToDB(user);
+  const { error } = await supabase.from('users').update(data).eq('id', user.id);
   if (error) throw error;
   return true;
 };

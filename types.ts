@@ -13,6 +13,7 @@ export interface User {
   password?: string;
   role: UserRole;
   active?: boolean;
+  usuarioMovidesk?: string;
 }
 
 export interface BrandingConfig {

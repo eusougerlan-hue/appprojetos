@@ -91,6 +91,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       const payload = {
         event: isUpdate ? 'training_log_updated' : 'training_log_created',
         apiKey: settings.apiKey,
+        usuario_movidesk: user.usuarioMovidesk || '', // ENVIANDO O USUÁRIO MOVIDESK DO FUNCIONÁRIO LOGADO
         client: client ? {
           id: client.id,
           razãoSocial: client.razãoSocial,
@@ -100,7 +101,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
           duracaoContratada: client.duracaoHoras,
           status: client.status
         } : null,
-        log: log, // Envia o objeto completo com todos os dados conforme solicitado
+        log: log, 
         timestamp: new Date().toISOString()
       };
       fetch(settings.webhookUrl, { 
@@ -240,7 +241,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
         <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center bg-white sticky top-0 z-10 gap-4">
           <div>
             <h2 className="text-xl font-black text-gray-800 tracking-tight">Atendimentos</h2>
-            <p className="text-xs text-gray-500 font-medium">Histórico de treinamentos realizados.</p>
+            <p className="text-sm text-gray-500 font-medium">Histórico de treinamentos realizados.</p>
           </div>
           <div className="flex flex-1 items-center justify-end gap-4 w-full md:w-auto">
             <input

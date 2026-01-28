@@ -102,6 +102,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     if (!formData.customerId) return alert('Selecione um cliente beneficiário.');
 
     const selectedCustomer = customers.find(c => c.id === formData.customerId);
+    const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
     const settings = await getStoredIntegrations();
     
     let finalProtocol = formData.protocolo;
@@ -119,7 +120,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           apiKey: settings.apiKey,
           razao_social: selectedCustomer?.razãoSocial,
           cnpj: selectedCustomer?.cnpj,
-          ref_movidesk: selectedCustomer?.refMovidesk || '', // ENVIANDO O REF MOVIDESK PARA O WEBHOOK
+          ref_movidesk: selectedCustomer?.refMovidesk || '', 
+          usuario_movidesk: selectedTech?.usuarioMovidesk || '', // ENVIANDO O USUÁRIO MOVIDESK DO FUNCIONÁRIO
           modulos: formData.modulos,
           tipo_treinamento: formData.tipoTreinamento,
           responsavel: formData.responsavelTecnico,
