@@ -226,7 +226,7 @@ const App: React.FC = () => {
         branding={branding}
       />
       
-      {/* Container Principal - Adicionada margem à esquerda no desktop para acomodar o sidebar fixo */}
+      {/* Container Principal */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-72 transition-all duration-300">
         <header className="bg-white border-b border-gray-100 px-4 md:px-8 py-4 flex justify-between items-center z-[40] shadow-sm flex-shrink-0">
           <div className="flex items-center gap-4">
@@ -242,14 +242,15 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            {loading && <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>}
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-sm font-black text-gray-800 leading-none">{currentUser?.name}</span>
-              <span className="text-[9px] text-blue-600 font-black uppercase tracking-widest mt-1.5">{currentUser?.role === UserRole.MANAGER ? 'Master Admin' : 'Tech Analyst'}</span>
-            </div>
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black border-2 border-white shadow-lg text-sm uppercase ring-4 ring-blue-50">
-              {currentUser?.name.charAt(0)}
+          <div className="flex items-center gap-2 md:gap-6">
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-sm font-black text-gray-800 leading-none">{currentUser?.name}</span>
+                <span className="text-[9px] text-blue-600 font-black uppercase tracking-widest mt-1.5">{currentUser?.role === UserRole.MANAGER ? 'Master Admin' : 'Tech Analyst'}</span>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black border-2 border-white shadow-lg text-sm uppercase ring-4 ring-blue-50">
+                {currentUser?.name.charAt(0)}
+              </div>
             </div>
           </div>
         </header>
