@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity } from '../types';
+import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity, Contact } from '../types';
 import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredLogs, deleteClient, getStoredUsers, updateClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
 
 interface TrainingPurchaseProps {
@@ -33,7 +33,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     valorImplantacao: 0,
     comissaoPercent: 0,
     responsavelTecnico: user.name,
-    observacao: ''
+    observacao: '',
+    solicitante: ''
   });
 
   const loadData = async () => {
@@ -79,8 +80,15 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     return list;
   }, [allClients, user, searchTerm]);
 
+  const keyUsers = useMemo(() => {
+    if (!formData.customerId) return [];
+    const customer = customers.find(c => c.id === formData.customerId);
+    if (!customer || !customer.contacts) return [];
+    return customer.contacts.filter(contact => contact.isKeyUser);
+  }, [formData.customerId, customers]);
+
   const handleCustomerChange = (cid: string) => {
-    setFormData(prev => ({ ...prev, customerId: cid }));
+    setFormData(prev => ({ ...prev, customerId: cid, solicitante: '' }));
     if (!editingId && cid) {
       const completedWithBalance = allClients.filter(c => 
         c.customerId === cid && 
@@ -121,13 +129,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           razao_social: selectedCustomer?.razãoSocial,
           cnpj: selectedCustomer?.cnpj,
           ref_movidesk: selectedCustomer?.refMovidesk || '', 
-          usuario_movidesk: selectedTech?.usuarioMovidesk || '', // ENVIANDO O USUÁRIO MOVIDESK DO FUNCIONÁRIO
+          usuario_movidesk: selectedTech?.usuarioMovidesk || '',
           modulos: formData.modulos,
           tipo_treinamento: formData.tipoTreinamento,
           responsavel: formData.responsavelTecnico,
           valor_implantacao: formData.valorImplantacao,
           carga_horaria: formData.duracaoHoras,
           observacao: formData.observacao,
+          solicitante: formData.solicitante,
           timestamp: new Date().toISOString()
         };
 
@@ -140,17 +149,25 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         if (!response.ok) {
            const errorBody = await response.text();
            console.error('Erro n8n:', errorBody);
-           throw new Error(`O n8n retornou erro ${response.status}. Certifique-se de que o workflow n8n está apenas devolvendo o protocolo.`);
+           throw new Error(`O n8n retornou erro HTTP ${response.status}.`);
         }
         
         const rawData = await response.json();
+        // n8n às vezes retorna um array de um objeto [ { ... } ] ou apenas o objeto { ... }
         const data = Array.isArray(rawData) ? rawData[0] : rawData;
         
-        if (data && data.protocolo) {
-          finalProtocol = data.protocolo;
-          setFormData(prev => ({ ...prev, protocolo: data.protocolo }));
+        console.log('Resposta Recebida do Webhook:', data);
+
+        // Busca pela chave 'protocolo' de forma insensível a maiúsculas (pode vir Protocolo ou protocolo)
+        const foundProtocolKey = Object.keys(data).find(k => k.toLowerCase() === 'protocolo');
+        const receivedProtocol = foundProtocolKey ? data[foundProtocolKey] : null;
+
+        if (receivedProtocol) {
+          finalProtocol = String(receivedProtocol);
+          setFormData(prev => ({ ...prev, protocolo: finalProtocol }));
         } else {
-          throw new Error('O n8n não retornou a chave "protocolo". Verifique o formato de resposta do n8n.');
+          console.error('Chave protocolo não encontrada na resposta:', data);
+          throw new Error('O Webhook n8n não retornou a chave "protocolo". Verifique o formato da resposta no n8n.');
         }
       } catch (err: any) {
         setGeneratingProtocol(false);
@@ -158,7 +175,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       }
     }
 
-    // ETAPA 2: SALVAMENTO NO SUPABASE (Sincronizado)
+    // ETAPA 2: SALVAMENTO NO SUPABASE
     setLoading(true);
     setGeneratingProtocol(false);
 
@@ -176,7 +193,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         comissaoPercent: Number(formData.comissaoPercent),
         status: editingId ? (allClients.find(c => c.id === editingId)?.status || 'pending') : 'pending',
         responsavelTecnico: formData.responsavelTecnico,
-        observacao: formData.observacao.trim()
+        observacao: formData.observacao.trim(),
+        solicitante: formData.solicitante
       };
 
       if (editingId) {
@@ -190,7 +208,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       onComplete(); 
     } catch (err: any) {
       console.error('Erro ao salvar no Supabase:', err);
-      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message || 'Verifique se a coluna tipo_treinamento existe no banco.'}`);
+      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message || 'Erro desconhecido.'}`);
     } finally {
       setLoading(false);
     }
@@ -233,7 +251,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       valorImplantacao: client.valorImplantacao,
       comissaoPercent: client.comissaoPercent,
       responsavelTecnico: client.responsavelTecnico,
-      observacao: client.observacao || ''
+      observacao: client.observacao || '',
+      solicitante: client.solicitante || ''
     });
     setViewMode('form');
   };
@@ -252,7 +271,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       valorImplantacao: 0,
       comissaoPercent: 0,
       responsavelTecnico: user.name,
-      observacao: ''
+      observacao: '',
+      solicitante: ''
     });
   };
 
@@ -389,6 +409,29 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
               </div>
 
               <div className="md:col-span-2">
+                <div className="p-6 border-2 border-blue-500 rounded-2xl bg-white animate-fadeIn">
+                  <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-3 ml-1">Solicitante (Usuários Chave)</label>
+                  <select 
+                    className="w-full px-6 py-4 rounded-xl border border-blue-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-blue-50/10 transition-all disabled:opacity-50" 
+                    value={formData.solicitante} 
+                    onChange={e => setFormData({...formData, solicitante: e.target.value})} 
+                    required 
+                    disabled={isViewOnly || !formData.customerId}
+                  >
+                    <option value="">Selecione o solicitante...</option>
+                    {keyUsers.map((contact, idx) => (
+                      <option key={idx} value={contact.name}>{contact.name} - {contact.email || 'Sem e-mail'}</option>
+                    ))}
+                  </select>
+                  {!formData.customerId ? (
+                    <p className="text-[9px] text-gray-400 mt-2 italic">* Selecione um cliente primeiro para carregar os usuários chave.</p>
+                  ) : keyUsers.length === 0 ? (
+                    <p className="text-[9px] text-red-400 mt-2 font-bold uppercase tracking-tighter">! Nenhum contato marcado como "Usuário Chave" no cadastro deste cliente.</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Módulos do Sistema Contratados</label>
                 <div className="flex flex-wrap gap-2">
                    {availableModules.map(mod => {
@@ -409,11 +452,25 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Valor Contrato (R$)</label>
-                    <input type="number" step="0.01" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.valorImplantacao} onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} required disabled={isViewOnly} />
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-400 bg-slate-100 cursor-not-allowed" 
+                      value={formData.valorImplantacao} 
+                      readOnly 
+                      disabled={true} 
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Comissão (%)</label>
-                    <input type="number" step="1" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.comissaoPercent} onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} required disabled={isViewOnly} />
+                    <input 
+                      type="number" 
+                      step="1" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-400 bg-slate-100 cursor-not-allowed" 
+                      value={formData.comissaoPercent} 
+                      readOnly 
+                      disabled={true} 
+                    />
                   </div>
               </div>
 

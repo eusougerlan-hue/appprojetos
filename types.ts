@@ -36,6 +36,7 @@ export interface Contact {
   name: string;
   phone: string;
   email: string;
+  isKeyUser?: boolean;
 }
 
 export interface Customer {
@@ -44,6 +45,7 @@ export interface Customer {
   cnpj: string;
   refMovidesk?: string;
   contacts?: Contact[];
+  usuarioChave?: boolean;
 }
 
 export interface Client {
@@ -63,6 +65,7 @@ export interface Client {
   responsavelTecnico: string;
   commissionPaid?: boolean;
   observacao?: string; // NOVO: Campo para observações do contrato
+  solicitante?: string; // NOVO: Contato que solicitou o treinamento (usuário chave)
 }
 
 export interface IntegrationSettings {

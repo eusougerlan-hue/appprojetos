@@ -37,14 +37,16 @@ const mapCustomerFromDB = (db: any): Customer => ({
   razãoSocial: db.razao_social,
   cnpj: db.cnpj,
   refMovidesk: db.ref_movidesk || '',
-  contacts: db.contacts || []
+  contacts: db.contacts || [],
+  usuarioChave: !!db.usuario_chave
 });
 
 const mapCustomerToDB = (customer: Customer) => ({
   razao_social: customer.razãoSocial,
   cnpj: customer.cnpj,
   ref_movidesk: customer.refMovidesk || '',
-  contacts: customer.contacts || []
+  contacts: customer.contacts || [],
+  usuario_chave: !!customer.usuarioChave
 });
 
 const mapClientFromDB = (db: any): Client => ({
@@ -63,7 +65,8 @@ const mapClientFromDB = (db: any): Client => ({
   status: db.status,
   responsavelTecnico: db.responsavel_tecnico || '',
   commissionPaid: db.commission_paid || false,
-  observacao: db.observacao || ''
+  observacao: db.observacao || '',
+  solicitante: db.solicitante || ''
 });
 
 const mapClientToDB = (client: Client) => {
@@ -82,7 +85,8 @@ const mapClientToDB = (client: Client) => {
     status: client.status,
     responsavel_tecnico: client.responsavelTecnico,
     commission_paid: client.commissionPaid || false,
-    observacao: client.observacao || ''
+    observacao: client.observacao || '',
+    solicitante: client.solicitante || ''
   };
   return data;
 };
@@ -113,6 +117,7 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
+  // Fix: mapping numeroProtocolo instead of numero_protocolo from log object
   numero_protocolo: log.numeroProtocolo,
   employee_id: log.employeeId,
   employee_name: log.employeeName,
@@ -123,6 +128,7 @@ const mapLogToDB = (log: TrainingLog) => ({
   end_time_2: log.endTime2 || null,
   received_by: log.receivedBy || [],
   observation: log.observation,
+  // Fix: mapping transportType instead of transport_type from log object
   transport_type: log.transportType,
   uber_ida: log.uberIda,
   uber_volta: log.uberVolta,
