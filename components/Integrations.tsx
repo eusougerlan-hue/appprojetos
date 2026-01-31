@@ -114,6 +114,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
         valor_implantacao: 4500.00,
         comissao_percent: 10,
         status: "pending",
+        solicitante: "NOME DO SOLICITANTE",
         observacao: "Venda importada via API"
       }, null, 2),
       GET: JSON.stringify([
@@ -122,7 +123,8 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
           protocolo: "202601004476",
           razao_social: "Cliente Ativo",
           status: "pending",
-          duracao_horas: 15.5
+          duracao_horas: 15.5,
+          solicitante: "Carlos Souza"
         }
       ], null, 2)
     },
@@ -135,7 +137,8 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
           {
             name: "João Silva",
             phone: "(11) 98888-7766",
-            email: "joao@cliente.com"
+            email: "joao@cliente.com",
+            isKeyUser: true
           }
         ]
       }, null, 2),
@@ -255,6 +258,19 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
                         <code className="text-[10px] text-blue-400 block bg-black/40 p-2 rounded-lg border border-slate-800">application/json</code>
                       </div>
                    </div>
+                </div>
+
+                {/* SQL FIX BLOCK */}
+                <div className="bg-red-900/20 p-6 rounded-3xl border border-red-900/50">
+                   <h4 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                     Correção de Banco (SQL)
+                   </h4>
+                   <p className="text-[9px] text-red-300 font-bold mb-3">Execute isto no SQL Editor do Supabase para suportar o campo 'Solicitante':</p>
+                   <code className="text-[10px] text-white block bg-black/40 p-3 rounded-lg border border-red-900/30 font-mono">
+                     ALTER TABLE clients ADD COLUMN solicitante TEXT;
+                   </code>
+                   <button onClick={() => copyToClipboard('ALTER TABLE clients ADD COLUMN solicitante TEXT;')} className="mt-3 text-[9px] font-black text-red-400 uppercase tracking-widest hover:text-red-300">Copiar Comando SQL</button>
                 </div>
 
                 <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">

@@ -117,7 +117,6 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
-  // Fix: mapping numeroProtocolo instead of numero_protocolo from log object
   numero_protocolo: log.numeroProtocolo,
   employee_id: log.employeeId,
   employee_name: log.employeeName,
@@ -128,7 +127,6 @@ const mapLogToDB = (log: TrainingLog) => ({
   end_time_2: log.endTime2 || null,
   received_by: log.receivedBy || [],
   observation: log.observation,
-  // Fix: mapping transportType instead of transport_type from log object
   transport_type: log.transportType,
   uber_ida: log.uberIda,
   uber_volta: log.uberVolta,
