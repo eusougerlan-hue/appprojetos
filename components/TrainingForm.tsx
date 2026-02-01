@@ -86,12 +86,16 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const triggerLogWebhook = async (log: TrainingLog, isUpdate: boolean) => {
     const settings = await getStoredIntegrations();
     if (!settings.webhookUrl) return;
+    
+    // CRITICAL: Force correct event names for training logs
+    const eventName = isUpdate ? 'training_log_updated' : 'training_log_created';
+    
     const client = clients.find(c => c.id === log.clientId);
     try {
       const payload = {
-        event: isUpdate ? 'training_log_updated' : 'training_log_created',
+        event: eventName,
         apiKey: settings.apiKey,
-        usuario_movidesk: user.usuarioMovidesk || '', // ENVIANDO O USUÁRIO MOVIDESK DO FUNCIONÁRIO LOGADO
+        usuario_movidesk: user.usuarioMovidesk || '', 
         client: client ? {
           id: client.id,
           razãoSocial: client.razãoSocial,
@@ -104,11 +108,12 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
         log: log, 
         timestamp: new Date().toISOString()
       };
-      fetch(settings.webhookUrl, { 
+      
+      await fetch(settings.webhookUrl, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload) 
-      }).catch(e => console.error('Erro silencioso no webhook:', e));
+      });
     } catch (error) { 
       console.error('Falha ao disparar webhook:', error); 
     }
@@ -139,7 +144,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     try {
       await deleteLog(id);
       setConfirmDeleteId(null);
-      onComplete(); // Atualiza a lista no App.tsx
+      onComplete();
     } catch (err) {
       alert('Erro ao excluir o registro.');
     } finally {
@@ -196,7 +201,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       const logData: TrainingLog = {
         id: editingLogId || Math.random().toString(36).substr(2, 9),
         clientId: formData.clientId,
-        numeroProtocolo: selectedClient?.protocolo || '', // NOVO: Captura o protocolo atual do cliente
+        numeroProtocolo: selectedClient?.protocolo || '',
         employeeId: user.id,
         employeeName: user.name,
         date: formData.date,
@@ -237,26 +242,26 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center bg-white sticky top-0 z-10 gap-4">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 animate-fadeIn overflow-hidden">
+        <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center bg-white sticky top-0 z-10 gap-4">
           <div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">Atendimentos</h2>
-            <p className="text-sm text-gray-500 font-medium">Histórico de treinamentos realizados.</p>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">Atendimentos</h2>
+            <p className="text-sm text-slate-500 font-medium">Histórico de treinamentos realizados.</p>
           </div>
           <div className="flex flex-1 items-center justify-end gap-4 w-full md:w-auto">
             <input
               type="text"
-              className="block w-full max-w-xs pl-4 pr-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="block w-full max-w-xs pl-4 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               placeholder="Buscar cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <button 
               onClick={() => { resetForm(); setViewMode('form'); }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-blue-100 flex items-center gap-2 uppercase tracking-wider"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-blue-100 flex items-center gap-2 uppercase tracking-wider transition-all active:scale-95"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-              Novo Treinamento
+              Novo Atendimento
             </button>
           </div>
         </div>
@@ -268,29 +273,29 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
              </div>
           ) : (
             <table className="w-full text-left">
-              <thead className="bg-gray-50">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Data / Cliente</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Horas</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Logística</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data / Cliente</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Horas</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Logística</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-16 text-center text-gray-400 font-bold">Nenhum treinamento registrado.</td>
+                    <td colSpan={4} className="px-6 py-16 text-center text-slate-400 font-bold">Nenhum treinamento registrado.</td>
                   </tr>
                 ) : (
                   filteredLogs.slice(0, 50).map((log) => {
                     const client = clients.find(c => c.id === log.clientId);
                     return (
-                      <tr key={log.id} className="hover:bg-gray-50 transition-colors group">
+                      <tr key={log.id} className="hover:bg-slate-50 transition-colors group">
                         <td className="px-6 py-4">
-                          <p className="font-black text-gray-800 text-sm leading-tight">{new Date(log.date).toLocaleDateString('pt-BR')}</p>
+                          <p className="font-black text-slate-700 text-sm leading-tight">{new Date(log.date).toLocaleDateString('pt-BR')}</p>
                           <p className="text-xs text-blue-600 font-black uppercase tracking-tighter mt-0.5">{client?.razãoSocial || 'Cliente Excluído'}</p>
                         </td>
-                        <td className="px-6 py-4 text-center text-sm font-black text-gray-800">{log.horasCalculadas.toFixed(1)}h</td>
+                        <td className="px-6 py-4 text-center text-sm font-black text-slate-800">{log.horasCalculadas.toFixed(1)}h</td>
                         <td className="px-6 py-4 text-center">
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full border bg-blue-50 text-blue-600">{log.transportType}</span>
                         </td>
@@ -301,7 +306,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
                             ) : confirmDeleteId === log.id ? (
                                <div className="flex items-center gap-1 animate-fadeIn">
                                   <button onClick={() => handleDeleteLog(log.id)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-red-700 shadow-sm transition-all">Apagar?</button>
-                                  <button onClick={() => setConfirmDeleteId(null)} className="bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-gray-200 transition-all">Sair</button>
+                                  <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-slate-200 transition-all">Sair</button>
                                </div>
                             ) : (
                                <>
@@ -324,21 +329,26 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-slideIn">
-      <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp overflow-hidden max-w-5xl mx-auto">
+      {/* Header outside the blue box */}
+      <div className="p-10 flex justify-between items-start">
         <div>
-          <h2 className="text-xl font-black text-gray-800 tracking-tight">{editingLogId ? 'Editar Treinamento' : 'Novo Treinamento'}</h2>
-          <p className="text-sm text-gray-500 font-medium">Os dados serão salvos permanentemente no Supabase.</p>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Novo Atendimento</h2>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">OS DADOS SERÃO SALVOS PERMANENTEMENTE NO SUPABASE.</p>
         </div>
-        <span className="px-4 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-black border border-blue-100">{user.name}</span>
+        <span className="px-6 py-2 bg-blue-50 text-blue-700 rounded-2xl text-[10px] font-black border border-blue-100 uppercase tracking-widest">{user.name}</span>
       </div>
       
-      <form onSubmit={handleSubmit} className="p-8 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-tight">Cliente Atendido</label>
+      <form onSubmit={handleSubmit} className="px-10 pb-10 space-y-10">
+        {/* Main blue box wrapping fields */}
+        <div className="border-2 border-blue-400 rounded-[2rem] p-10 space-y-10 relative">
+          
+          {/* CLIENTE ATENDIDO */}
+          <div className="space-y-3">
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CLIENTE ATENDIDO</label>
             <select
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-gray-50/50"
+              className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-white transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center]" 
+              style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2.5\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundSize: '1.2rem'}}
               value={formData.clientId}
               onChange={(e) => setFormData({...formData, clientId: e.target.value, receivedBy: []})}
               required
@@ -349,116 +359,128 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-tight">Data do Atendimento</label>
-            <input type="date" className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none font-bold" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required disabled={loading} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-tight">Número do Protocolo</label>
-            <div className="w-full px-4 py-3 rounded-xl border font-black bg-gray-100 border-gray-200 text-gray-400">
-              {selectedClient ? selectedClient.protocolo : 'Selecione um cliente'}
-            </div>
-          </div>
-        </div>
-
-        {/* HORÁRIOS */}
-        <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-6">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Horários de Atendimento</h4>
-          </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded">1º Turno (Obrigatório)</span>
-              <div className="grid grid-cols-2 gap-4">
-                <input type="time" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 font-bold" value={formData.startTime1} onChange={(e) => setFormData({...formData, startTime1: e.target.value})} required disabled={loading} />
-                <input type="time" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 font-bold" value={formData.endTime1} onChange={(e) => setFormData({...formData, endTime1: e.target.value})} required disabled={loading} />
-              </div>
+            {/* DATA DO ATENDIMENTO */}
+            <div className="space-y-3">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">DATA DO ATENDIMENTO</label>
+              <input type="date" className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-200 focus:border-blue-500 outline-none font-black text-slate-800 bg-white transition-all" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required disabled={loading} />
             </div>
 
-            <div className="space-y-4">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 px-2 py-0.5 rounded">2º Turno (Opcional)</span>
-              <div className="grid grid-cols-2 gap-4">
-                <input type="time" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 font-bold" value={formData.startTime2} onChange={(e) => setFormData({...formData, startTime2: e.target.value})} disabled={loading} />
-                <input type="time" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 font-bold" value={formData.endTime2} onChange={(e) => setFormData({...formData, endTime2: e.target.value})} disabled={loading} />
+            {/* NÚMERO DO PROTOCOLO */}
+            <div className="space-y-3">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NÚMERO DO PROTOCOLO</label>
+              <div className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-100 font-black bg-slate-50 text-slate-400 min-h-[64px] flex items-center shadow-inner">
+                {selectedClient ? selectedClient.protocolo : 'Selecione um cliente'}
               </div>
+            </div>
+          </div>
+
+          {/* HORÁRIOS DE ATENDIMENTO */}
+          <div className="p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 space-y-8">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">HORÁRIOS DE ATENDIMENTO</h4>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className="space-y-5">
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-100/50 px-4 py-1.5 rounded-full border border-blue-100">1º TURNO (OBRIGATÓRIO)</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-300 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.startTime1} onChange={(e) => setFormData({...formData, startTime1: e.target.value})} required disabled={loading} />
+                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-300 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.endTime1} onChange={(e) => setFormData({...formData, endTime1: e.target.value})} required disabled={loading} />
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-1.5 rounded-full border border-slate-100">2º TURNO (OPCIONAL)</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-200 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.startTime2} onChange={(e) => setFormData({...formData, startTime2: e.target.value})} disabled={loading} />
+                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-200 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.endTime2} onChange={(e) => setFormData({...formData, endTime2: e.target.value})} disabled={loading} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* LOGÍSTICA DE DESLOCAMENTO */}
+          <div className="p-8 bg-indigo-50/20 rounded-[2rem] border-2 border-indigo-100/50 space-y-8">
+            <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                </div>
+                <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">LOGÍSTICA DE DESLOCAMENTO</h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tipo de Deslocamento</label>
+                  <select className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-indigo-100 focus:border-indigo-500 outline-none font-bold text-indigo-700 bg-white transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center]" 
+                    style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2.5\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundSize: '1.2rem'}}
+                    value={formData.transportType} onChange={(e) => setFormData({...formData, transportType: e.target.value as TransportType})} disabled={loading}>
+                      <option value={TransportType.ONLINE}>🌐 Atendimento Online (Sem custos)</option>
+                      <option value={TransportType.UBER}>🚖 Uber / Táxi</option>
+                      <option value={TransportType.OWN_VEHICLE}>🚗 Veículo Próprio</option>
+                  </select>
+                </div>
+
+                {formData.transportType === TransportType.UBER && (
+                  <div className="grid grid-cols-2 gap-4 animate-fadeIn">
+                    <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor Ida (R$)</label>
+                        <input type="number" step="0.01" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.uberIda} onChange={e => setFormData({...formData, uberIda: Number(e.target.value)})} disabled={loading} />
+                    </div>
+                    <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor Volta (R$)</label>
+                        <input type="number" step="0.01" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.uberVolta} onChange={e => setFormData({...formData, uberVolta: Number(e.target.value)})} disabled={loading} />
+                    </div>
+                  </div>
+                )}
+
+                {formData.transportType === TransportType.OWN_VEHICLE && (
+                  <div className="grid grid-cols-2 gap-4 animate-fadeIn">
+                    <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">KM Rodado</label>
+                        <input type="number" step="0.1" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.ownVehicleKm} onChange={e => setFormData({...formData, ownVehicleKm: Number(e.target.value)})} disabled={loading} />
+                    </div>
+                    <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor p/ KM (R$)</label>
+                        <input type="number" step="0.01" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.ownVehicleKmValue} onChange={e => setFormData({...formData, ownVehicleKmValue: Number(e.target.value)})} disabled={loading} />
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
+
+          {/* PARTICIPANTES E OBSERVAÇÕES */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
+            <div className="space-y-5">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">PARTICIPANTES</label>
+                <div className="flex flex-wrap gap-2 p-8 bg-slate-50/50 rounded-[2rem] border border-slate-200 min-h-[120px] shadow-inner">
+                  {availableContacts.length === 0 ? <p className="text-[10px] text-slate-400 font-bold italic p-1">Nenhum contato cadastrado.</p> : 
+                    availableContacts.map(contact => {
+                      const isSelected = formData.receivedBy.some(c => c.name === contact.name);
+                      return (
+                        <button key={contact.name} type="button" onClick={() => toggleContactSelection(contact)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black border-2 transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400'}`}>
+                          {contact.name}
+                        </button>
+                      );
+                  })}
+                </div>
+            </div>
+
+            <div className="space-y-5">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">INFORMAÇÕES ADICIONAIS / OBSERVAÇÃO</label>
+                <textarea className="w-full px-8 py-8 rounded-[2rem] border-2 border-slate-200 focus:border-blue-500 h-44 outline-none text-sm font-bold text-slate-700 bg-white resize-none shadow-inner transition-all" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="Descreva aqui os detalhes do que foi treinado..." disabled={loading}></textarea>
             </div>
           </div>
         </div>
 
-        {/* LOGÍSTICA */}
-        <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-6">
-           <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Logística de Deslocamento</h4>
-           </div>
-
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tipo de Deslocamento</label>
-                 <select className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:border-blue-500 outline-none font-bold text-blue-700 bg-white" value={formData.transportType} onChange={(e) => setFormData({...formData, transportType: e.target.value as TransportType})} disabled={loading}>
-                    <option value={TransportType.ONLINE}>🌐 Atendimento Online (Sem custos)</option>
-                    <option value={TransportType.UBER}>🚖 Uber / Táxi</option>
-                    <option value={TransportType.OWN_VEHICLE}>🚗 Veículo Próprio</option>
-                 </select>
-              </div>
-
-              {formData.transportType === TransportType.UBER && (
-                <div className="grid grid-cols-2 gap-3 animate-fadeIn">
-                   <div>
-                      <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Valor Ida (R$)</label>
-                      <input type="number" step="0.01" className="w-full px-3 py-2.5 rounded-xl border border-blue-200 font-bold bg-white" value={formData.uberIda} onChange={e => setFormData({...formData, uberIda: Number(e.target.value)})} disabled={loading} />
-                   </div>
-                   <div>
-                      <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Valor Volta (R$)</label>
-                      <input type="number" step="0.01" className="w-full px-3 py-2.5 rounded-xl border border-blue-200 font-bold bg-white" value={formData.uberVolta} onChange={e => setFormData({...formData, uberVolta: Number(e.target.value)})} disabled={loading} />
-                   </div>
-                </div>
-              )}
-
-              {formData.transportType === TransportType.OWN_VEHICLE && (
-                <div className="grid grid-cols-2 gap-3 animate-fadeIn">
-                   <div>
-                      <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">KM Rodado</label>
-                      <input type="number" step="0.1" className="w-full px-3 py-2.5 rounded-xl border border-blue-200 font-bold bg-white" value={formData.ownVehicleKm} onChange={e => setFormData({...formData, ownVehicleKm: Number(e.target.value)})} disabled={loading} />
-                   </div>
-                   <div>
-                      <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Valor p/ KM (R$)</label>
-                      <input type="number" step="0.01" className="w-full px-3 py-2.5 rounded-xl border border-blue-200 font-bold bg-white" value={formData.ownVehicleKmValue} onChange={e => setFormData({...formData, ownVehicleKmValue: Number(e.target.value)})} disabled={loading} />
-                   </div>
-                </div>
-              )}
-           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div>
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-tight">Participantes</label>
-              <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100 min-h-[50px]">
-                 {availableContacts.length === 0 ? <p className="text-[10px] text-gray-400 font-bold italic p-1">Nenhum contato no cadastro do cliente.</p> : 
-                   availableContacts.map(contact => {
-                    const isSelected = formData.receivedBy.some(c => c.name === contact.name);
-                    return (
-                      <button key={contact.name} type="button" onClick={() => toggleContactSelection(contact)} className={`px-4 py-2 rounded-xl text-xs font-black border transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100' : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300'}`}>
-                         {contact.name}
-                      </button>
-                    );
-                 })}
-              </div>
-           </div>
-
-           <div>
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-tight">Observações</label>
-              <textarea className="w-full px-4 py-3 rounded-xl border border-gray-300 h-[88px] focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium resize-none" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="O que foi treinado hoje?" disabled={loading}></textarea>
-           </div>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-          <button type="button" onClick={() => { resetForm(); setViewMode('list'); }} className="px-8 py-3.5 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-gray-600 transition-all rounded-xl" disabled={loading}>Cancelar</button>
-          <button type="submit" disabled={loading} className="px-12 py-3.5 bg-blue-600 text-white font-black rounded-xl shadow-xl shadow-blue-100 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 uppercase tracking-widest text-[10px]">
-            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : (editingLogId ? 'Salvar Alterações' : 'Salvar Atendimento')}
+        {/* Action buttons outside the blue box */}
+        <div className="flex justify-end items-center gap-10 pt-4 px-4">
+          <button type="button" onClick={() => { resetForm(); setViewMode('list'); }} className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all" disabled={loading}>CANCELAR</button>
+          <button type="submit" disabled={loading} className="px-24 py-6 bg-blue-600 text-white font-black rounded-[1.5rem] shadow-2xl shadow-blue-200 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50 flex items-center gap-4 uppercase tracking-[0.2em] text-[11px]">
+            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : (editingLogId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR ATENDIMENTO')}
           </button>
         </div>
       </form>

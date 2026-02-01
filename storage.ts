@@ -36,9 +36,9 @@ const mapCustomerFromDB = (db: any): Customer => ({
   id: db.id,
   razãoSocial: db.razao_social,
   cnpj: db.cnpj,
+  // Fix: changed 'ref_movidesk' to 'refMovidesk' to match the Customer interface
   refMovidesk: db.ref_movidesk || '',
-  contacts: db.contacts || [],
-  usuarioChave: !!db.usuario_chave
+  contacts: db.contacts || []
 });
 
 const mapCustomerToDB = (customer: Customer) => ({
@@ -46,7 +46,7 @@ const mapCustomerToDB = (customer: Customer) => ({
   cnpj: customer.cnpj,
   ref_movidesk: customer.refMovidesk || '',
   contacts: customer.contacts || [],
-  usuario_chave: !!customer.usuarioChave
+  usuario_chave: customer.contacts?.some(c => c.keyUser) || false
 });
 
 const mapClientFromDB = (db: any): Client => ({
@@ -56,6 +56,7 @@ const mapClientFromDB = (db: any): Client => ({
   protocolo: db.protocolo,
   modulos: db.modulos || [],
   tipoTreinamento: db.tipo_treinamento || '',
+  solicitante: db.solicitante || '',
   duracaoHoras: Number(db.duracao_horas || 0),
   residualHoursAdded: Number(db.residual_hours_added || 0),
   dataInicio: db.data_inicio,
@@ -65,8 +66,7 @@ const mapClientFromDB = (db: any): Client => ({
   status: db.status,
   responsavelTecnico: db.responsavel_tecnico || '',
   commissionPaid: db.commission_paid || false,
-  observacao: db.observacao || '',
-  solicitante: db.solicitante || ''
+  observacao: db.observacao || ''
 });
 
 const mapClientToDB = (client: Client) => {
@@ -75,7 +75,8 @@ const mapClientToDB = (client: Client) => {
     razao_social: client.razãoSocial,
     protocolo: client.protocolo,
     modulos: client.modulos,
-    tipo_treinamento: client.tipoTreinamento, 
+    tipo_treinamento: client.tipoTreinamento,
+    solicitante: client.solicitante || '',
     duracao_horas: client.duracaoHoras,
     residual_hours_added: client.residualHoursAdded || 0,
     data_inicio: client.dataInicio,
@@ -85,8 +86,7 @@ const mapClientToDB = (client: Client) => {
     status: client.status,
     responsavel_tecnico: client.responsavelTecnico,
     commission_paid: client.commissionPaid || false,
-    observacao: client.observacao || '',
-    solicitante: client.solicitante || ''
+    observacao: client.observacao || ''
   };
   return data;
 };
@@ -117,6 +117,7 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
+  // Fix: changed 'log.numero_protocolo' to 'log.numeroProtocolo' to match TrainingLog interface
   numero_protocolo: log.numeroProtocolo,
   employee_id: log.employeeId,
   employee_name: log.employeeName,
@@ -420,6 +421,7 @@ export const saveCloudConfigToDB = async (url: string, key: string) => {
   try {
     resetSupabaseClient();
     localStorage.setItem(SUPABASE_URL_KEY, url);
+    // Fix: Using SUPABASE_KEY_KEY constant instead of undefined SUPABASE_ANON_KEY
     localStorage.setItem(SUPABASE_KEY_KEY, key);
     
     const client = getSupabase();

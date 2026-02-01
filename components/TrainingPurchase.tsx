@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity, Contact } from '../types';
+import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity } from '../types';
 import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredLogs, deleteClient, getStoredUsers, updateClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
 
 interface TrainingPurchaseProps {
@@ -28,13 +28,13 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     protocolo: '',
     modulos: [] as string[],
     tipoTreinamento: '',
+    solicitante: '',
     duracaoHoras: 0,
     dataInicio: new Date().toISOString().split('T')[0],
     valorImplantacao: 0,
     comissaoPercent: 0,
     responsavelTecnico: user.name,
-    observacao: '',
-    solicitante: ''
+    observacao: ''
   });
 
   const loadData = async () => {
@@ -83,8 +83,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const keyUsers = useMemo(() => {
     if (!formData.customerId) return [];
     const customer = customers.find(c => c.id === formData.customerId);
-    if (!customer || !customer.contacts) return [];
-    return customer.contacts.filter(contact => contact.isKeyUser);
+    return customer?.contacts?.filter(c => c.keyUser) || [];
   }, [formData.customerId, customers]);
 
   const handleCustomerChange = (cid: string) => {
@@ -108,10 +107,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     if (loading || isViewOnly || generatingProtocol) return;
 
     if (!formData.customerId) return alert('Selecione um cliente beneficiário.');
+    if (!formData.solicitante) return alert('Selecione o solicitante (Usuário Chave).');
 
     const selectedCustomer = customers.find(c => c.id === formData.customerId);
     const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
     const settings = await getStoredIntegrations();
+    
+    // Busca os dados de contato do solicitante para enviar ao webhook
+    const solicitanteContact = keyUsers.find(c => c.name === formData.solicitante);
     
     let finalProtocol = formData.protocolo;
 
@@ -132,11 +135,13 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           usuario_movidesk: selectedTech?.usuarioMovidesk || '',
           modulos: formData.modulos,
           tipo_treinamento: formData.tipoTreinamento,
+          solicitante: formData.solicitante,
+          solicitante_telefone: solicitanteContact?.phone || '',
+          solicitante_email: solicitanteContact?.email || '',
           responsavel: formData.responsavelTecnico,
           valor_implantacao: formData.valorImplantacao,
           carga_horaria: formData.duracaoHoras,
           observacao: formData.observacao,
-          solicitante: formData.solicitante,
           timestamp: new Date().toISOString()
         };
 
@@ -149,25 +154,17 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         if (!response.ok) {
            const errorBody = await response.text();
            console.error('Erro n8n:', errorBody);
-           throw new Error(`O n8n retornou erro HTTP ${response.status}.`);
+           throw new Error(`O n8n retornou erro ${response.status}.`);
         }
         
         const rawData = await response.json();
-        // n8n às vezes retorna um array de um objeto [ { ... } ] ou apenas o objeto { ... }
         const data = Array.isArray(rawData) ? rawData[0] : rawData;
         
-        console.log('Resposta Recebida do Webhook:', data);
-
-        // Busca pela chave 'protocolo' de forma insensível a maiúsculas (pode vir Protocolo ou protocolo)
-        const foundProtocolKey = Object.keys(data).find(k => k.toLowerCase() === 'protocolo');
-        const receivedProtocol = foundProtocolKey ? data[foundProtocolKey] : null;
-
-        if (receivedProtocol) {
-          finalProtocol = String(receivedProtocol);
-          setFormData(prev => ({ ...prev, protocolo: finalProtocol }));
+        if (data && data.protocolo) {
+          finalProtocol = data.protocolo;
+          setFormData(prev => ({ ...prev, protocolo: data.protocolo }));
         } else {
-          console.error('Chave protocolo não encontrada na resposta:', data);
-          throw new Error('O Webhook n8n não retornou a chave "protocolo". Verifique o formato da resposta no n8n.');
+          throw new Error('O n8n não retornou a chave "protocolo".');
         }
       } catch (err: any) {
         setGeneratingProtocol(false);
@@ -175,7 +172,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       }
     }
 
-    // ETAPA 2: SALVAMENTO NO SUPABASE
+    // ETAPA 2: SALVAMENTO NO SUPABASE (Sincronizado)
     setLoading(true);
     setGeneratingProtocol(false);
 
@@ -187,14 +184,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         protocolo: finalProtocol, 
         modulos: formData.modulos,
         tipoTreinamento: formData.tipoTreinamento,
+        solicitante: formData.solicitante,
         duracaoHoras: Number(formData.duracaoHoras),
         dataInicio: formData.dataInicio,
         valorImplantacao: Number(formData.valorImplantacao),
         comissaoPercent: Number(formData.comissaoPercent),
         status: editingId ? (allClients.find(c => c.id === editingId)?.status || 'pending') : 'pending',
         responsavelTecnico: formData.responsavelTecnico,
-        observacao: formData.observacao.trim(),
-        solicitante: formData.solicitante
+        observacao: formData.observacao.trim()
       };
 
       if (editingId) {
@@ -208,7 +205,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       onComplete(); 
     } catch (err: any) {
       console.error('Erro ao salvar no Supabase:', err);
-      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message || 'Erro desconhecido.'}`);
+      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -246,13 +243,13 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       protocolo: client.protocolo,
       modulos: client.modulos,
       tipoTreinamento: client.tipoTreinamento,
+      solicitante: client.solicitante || '',
       duracaoHoras: client.duracaoHoras,
       dataInicio: client.dataInicio,
       valorImplantacao: client.valorImplantacao,
       comissaoPercent: client.comissaoPercent,
       responsavelTecnico: client.responsavelTecnico,
-      observacao: client.observacao || '',
-      solicitante: client.solicitante || ''
+      observacao: client.observacao || ''
     });
     setViewMode('form');
   };
@@ -266,13 +263,13 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       protocolo: '',
       modulos: [],
       tipoTreinamento: availableTypes[0]?.name || '',
+      solicitante: '',
       duracaoHoras: 0,
       dataInicio: new Date().toISOString().split('T')[0],
       valorImplantacao: 0,
       comissaoPercent: 0,
       responsavelTecnico: user.name,
-      observacao: '',
-      solicitante: ''
+      observacao: ''
     });
   };
 
@@ -409,26 +406,22 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
               </div>
 
               <div className="md:col-span-2">
-                <div className="p-6 border-2 border-blue-500 rounded-2xl bg-white animate-fadeIn">
-                  <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-3 ml-1">Solicitante (Usuários Chave)</label>
-                  <select 
-                    className="w-full px-6 py-4 rounded-xl border border-blue-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-blue-50/10 transition-all disabled:opacity-50" 
-                    value={formData.solicitante} 
-                    onChange={e => setFormData({...formData, solicitante: e.target.value})} 
-                    required 
-                    disabled={isViewOnly || !formData.customerId}
-                  >
-                    <option value="">Selecione o solicitante...</option>
-                    {keyUsers.map((contact, idx) => (
-                      <option key={idx} value={contact.name}>{contact.name} - {contact.email || 'Sem e-mail'}</option>
-                    ))}
-                  </select>
-                  {!formData.customerId ? (
-                    <p className="text-[9px] text-gray-400 mt-2 italic">* Selecione um cliente primeiro para carregar os usuários chave.</p>
-                  ) : keyUsers.length === 0 ? (
-                    <p className="text-[9px] text-red-400 mt-2 font-bold uppercase tracking-tighter">! Nenhum contato marcado como "Usuário Chave" no cadastro deste cliente.</p>
-                  ) : null}
-                </div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Solicitante (Usuário Chave)</label>
+                <select 
+                  className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-blue-600 bg-slate-50/50 transition-all disabled:opacity-50" 
+                  value={formData.solicitante} 
+                  onChange={e => setFormData({...formData, solicitante: e.target.value})} 
+                  required 
+                  disabled={isViewOnly || !formData.customerId}
+                >
+                  <option value="">Selecione um Usuário Chave...</option>
+                  {keyUsers.map((contact, idx) => (
+                    <option key={idx} value={contact.name}>{contact.name}</option>
+                  ))}
+                  {formData.customerId && keyUsers.length === 0 && (
+                    <option disabled value="">Nenhum Usuário Chave cadastrado para este cliente</option>
+                  )}
+                </select>
               </div>
 
               <div className="md:col-span-2">
@@ -455,10 +448,10 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <input 
                       type="number" 
                       step="0.01" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-400 bg-slate-100 cursor-not-allowed" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-400 bg-slate-100 cursor-not-allowed" 
                       value={formData.valorImplantacao} 
                       readOnly 
-                      disabled={true} 
+                      disabled
                     />
                   </div>
                   <div>
@@ -466,10 +459,10 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <input 
                       type="number" 
                       step="1" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-400 bg-slate-100 cursor-not-allowed" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-400 bg-slate-100 cursor-not-allowed" 
                       value={formData.comissaoPercent} 
                       readOnly 
-                      disabled={true} 
+                      disabled
                     />
                   </div>
               </div>
