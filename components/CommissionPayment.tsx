@@ -94,7 +94,7 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
           </button>
           <button
             onClick={() => setFilter('PENDING')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'PENDING' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'PENDING' ? 'bg-orange-50 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
             A Pagar
           </button>
@@ -203,7 +203,8 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
                     commissions.map((c) => (
                       <tr key={c.id} className={`hover:bg-gray-50 transition-colors ${c.commissionPaid ? 'bg-gray-50/50' : ''}`}>
                         <td className="px-6 py-4">
-                          <p className="font-bold text-blue-600 text-sm">{c.responsavelTecnico}</p>
+                          <p className="text-[10px] text-blue-500 font-black uppercase tracking-tighter mb-0.5">{c.protocolo}</p>
+                          <p className="font-bold text-blue-600 text-sm leading-tight">{c.responsavelTecnico}</p>
                           <p className="text-xs text-gray-500 font-medium">{c.razãoSocial}</p>
                         </td>
                         <td className="px-6 py-4 text-center">
