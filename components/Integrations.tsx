@@ -108,6 +108,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
         protocolo: "202601004476",
         modulos: ["CRM", "Estoque", "Financeiro"],
         tipo_treinamento: "Implantação Presencial",
+        solicitante: "Nome do Usuário Chave",
         duracao_horas: 20,
         data_inicio: "2026-02-15",
         responsavel_tecnico: "Nome do Instrutor",
@@ -121,6 +122,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
           id: "uuid-interna",
           protocolo: "202601004476",
           razao_social: "Cliente Ativo",
+          solicitante: "João da Silva",
           status: "pending",
           duracao_horas: 15.5
         }
@@ -135,7 +137,8 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
           {
             name: "João Silva",
             phone: "(11) 98888-7766",
-            email: "joao@cliente.com"
+            email: "joao@cliente.com",
+            keyUser: true
           }
         ]
       }, null, 2),
@@ -144,7 +147,13 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
           id: "uuid-cliente",
           razao_social: "Empresa Master",
           cnpj: "12.345.678/0001-99",
-          ref_movidesk: "MD-123"
+          ref_movidesk: "MD-123",
+          contacts: [
+            {
+              name: "João Silva",
+              keyUser: true
+            }
+          ]
         }
       ], null, 2)
     }
@@ -258,12 +267,13 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
                 </div>
 
                 <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
-                   <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">Campos Obrigatórios ({docEntity === 'SALE' ? 'Venda' : 'Cliente'})</h4>
+                   <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">Campos Principais ({docEntity === 'SALE' ? 'Venda' : 'Cliente'})</h4>
                    <div className="space-y-3 text-[10px] font-medium text-slate-400">
                       {docEntity === 'SALE' ? (
                         <>
                           <p><strong className="text-white">customer_id:</strong> Link com UUID do cliente base.</p>
                           <p><strong className="text-white">protocolo:</strong> Número único de atendimento.</p>
+                          <p><strong className="text-white">solicitante:</strong> Nome do Usuário Chave que solicitou.</p>
                           <p><strong className="text-white">tipo_treinamento:</strong> Nome idêntico ao cadastrado.</p>
                           <p><strong className="text-white">duracao_horas:</strong> Carga horária total (number).</p>
                         </>
@@ -271,7 +281,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
                         <>
                           <p><strong className="text-white">razao_social:</strong> Nome jurídico da empresa.</p>
                           <p><strong className="text-white">cnpj:</strong> Formato string com pontuação.</p>
-                          <p><strong className="text-white">ref_movidesk:</strong> Código do cliente no Movidesk.</p>
+                          <p><strong className="text-white">contacts:</strong> Lista de contatos com <code className="text-blue-400">keyUser: true</code> para Usuários Chave.</p>
                         </>
                       )}
                    </div>
@@ -313,7 +323,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
             <div className="mt-12 pt-8 border-t border-slate-800 flex items-center gap-4 text-slate-500">
                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
-                 Nota: Para vincular uma venda via API, você deve primeiro obter o <code className="text-white">id</code> do cliente via GET em <code className="text-white">/customers</code> e usá-lo no campo <code className="text-white">customer_id</code>.
+                 Nota: O campo <code className="text-white">solicitante</code> nas vendas deve conter o nome de um contato marcado como <code className="text-blue-400">keyUser: true</code> na base de clientes para correta exibição no sistema.
                </p>
             </div>
           </div>
