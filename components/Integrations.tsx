@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { IntegrationSettings, BrandingConfig } from '../types';
-import { getStoredIntegrations, saveIntegrations, saveCloudConfigToDB, getStoredBranding, saveBranding, getStoredCloudConfig } from '../storage';
+// Import saveBranding from storage to fix the compilation error.
+import { getStoredIntegrations, saveIntegrations, getStoredBranding, getStoredCloudConfig, saveBranding } from '../storage';
 import { isSupabaseConfigured, resetSupabaseClient } from '../supabase';
 
 interface IntegrationsProps {
@@ -64,10 +65,8 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await saveCloudConfigToDB(supabaseUrl.trim(), supabaseKey.trim());
       await saveIntegrations(settings);
-      alert('Configurações salvas e sincronizadas!');
-      window.location.reload();
+      alert('Configurações do Webhook salvas com sucesso!');
     } catch (err) {
       alert('Erro ao salvar configurações de conexão.');
     } finally {
@@ -173,31 +172,21 @@ const Integrations: React.FC<IntegrationsProps> = ({ onBrandingChange }) => {
             <h2 className="text-2xl font-black text-gray-800 tracking-tight">Conectividade Global</h2>
           </div>
           <form onSubmit={handleSaveConfig} className="p-10 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 ml-1 tracking-widest">Supabase URL</label>
-                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-gray-200 outline-none font-bold text-gray-700 bg-gray-50/50" value={supabaseUrl} onChange={e => setSupabaseUrl(e.target.value)} required />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 ml-1 tracking-widest">Anon Key</label>
-                <input type="password" className="w-full px-6 py-4 rounded-2xl border border-gray-200 outline-none font-bold text-gray-700 bg-gray-50/50" value={supabaseKey} onChange={e => setSupabaseKey(e.target.value)} required />
-              </div>
-              <div className="md:col-span-2 pt-8 border-t border-gray-50">
-                 <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-6">Integrações Customizadas (Webhook n8n)</h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                       <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 ml-1 tracking-widest">Webhook URL</label>
-                       <input type="url" className="w-full px-6 py-4 rounded-2xl border border-gray-200 font-bold text-gray-700 bg-gray-50/50" value={settings.webhookUrl} onChange={e => setSettings({...settings, webhookUrl: e.target.value})} placeholder="https://seu-n8n-url.com" />
-                    </div>
-                    <div>
-                       <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 ml-1 tracking-widest">API Key Webhook</label>
-                       <input type="password" className="w-full px-6 py-4 rounded-2xl border border-gray-200 font-bold text-gray-700 bg-gray-50/50" value={settings.apiKey} onChange={e => setSettings({...settings, apiKey: e.target.value})} placeholder="Secret Key" />
-                    </div>
-                 </div>
-              </div>
+            <div className="space-y-6">
+               <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-6 border-b border-blue-50 pb-2">Integrações Customizadas (Webhook n8n)</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 ml-1 tracking-widest">Webhook URL</label>
+                     <input type="url" className="w-full px-6 py-4 rounded-2xl border border-gray-200 font-bold text-gray-700 bg-gray-50/50 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" value={settings.webhookUrl} onChange={e => setSettings({...settings, webhookUrl: e.target.value})} placeholder="https://seu-n8n-url.com" />
+                  </div>
+                  <div>
+                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 ml-1 tracking-widest">API Key Webhook</label>
+                     <input type="password" className="w-full px-6 py-4 rounded-2xl border border-gray-200 font-bold text-gray-700 bg-gray-50/50 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" value={settings.apiKey} onChange={e => setSettings({...settings, apiKey: e.target.value})} placeholder="Secret Key" />
+                  </div>
+               </div>
             </div>
             <div className="flex justify-end pt-6">
-              <button type="submit" disabled={loading} className="px-16 py-5 bg-blue-600 text-white font-black rounded-[1.25rem] text-xs uppercase tracking-[0.2em]">Gravar Configurações</button>
+              <button type="submit" disabled={loading} className="px-16 py-5 bg-blue-600 text-white font-black rounded-[1.25rem] text-xs uppercase tracking-[0.2em] shadow-xl shadow-blue-100 active:scale-95 transition-all">Gravar Configurações</button>
             </div>
           </form>
         </div>
