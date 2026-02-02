@@ -80,10 +80,13 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
     });
     const participantes = Array.from(participantsMap.values());
     
-    // Busca o refMovidesk do cliente base
+    // Busca o cliente base para obter contatos e refMovidesk
     const customer = customers.find(c => c.id === client.customerId);
     
-    // Busca o usuarioMovidesk do técnico responsável pelo nome
+    // Busca os dados detalhados do Solicitante (Usuário Chave)
+    const solicitanteDados = customer?.contacts?.find(c => c.name === client.solicitante);
+    
+    // Busca o usuarioMovidesk do técnico responsável
     const technicianUser = allUsers.find(u => u.name === technicianName);
 
     try {
@@ -93,8 +96,12 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
         protocolo: client.protocolo,
         razao_social: client.razãoSocial,
         ref_movidesk: customer?.refMovidesk || '', 
-        usuario_movidesk: technicianUser?.usuarioMovidesk || '', // ENVIANDO O USUÁRIO MOVIDESK DO TÉCNICO
+        usuario_movidesk: technicianUser?.usuarioMovidesk || '',
         tipo_treinamento: client.tipoTreinamento,
+        modulos: client.modulos, // Enviando os módulos contratados
+        solicitante_nome: client.solicitante || '',
+        solicitante_telefone: solicitanteDados?.phone || '', // Telefone do solicitante
+        solicitante_email: solicitanteDados?.email || '', // E-mail do solicitante
         horas_contratadas: client.duracaoHoras,
         horas_utilizadas: Number(usedHours.toFixed(1)),
         saldo_restante: Number(balance.toFixed(1)),
@@ -140,12 +147,10 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
     const balance = activeClient.duracaoHoras - used;
     const technician = getResponsibleTechnician(activeClient);
     
-    // Captura a data atual YYYY-MM-DD
     const dataAtual = new Date().toISOString().split('T')[0];
 
     await triggerFinalizeWebhook(activeClient, used, balance, technician, finalizeMessage);
 
-    // Salva status concluído, data final e saldo de horas na coluna residual_hours_added
     const success = await updateClientStatus(activeClient.id, 'completed', dataAtual, Number(balance.toFixed(1)));
     if (success) {
       refreshData();
@@ -155,7 +160,6 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
 
   const executeRevert = async () => {
     if (!activeClient) return;
-    // Ao reverter, limpamos a data fim e o saldo de horas residual
     const success = await updateClientStatus(activeClient.id, 'pending', null, 0);
     if (success) {
       refreshData();

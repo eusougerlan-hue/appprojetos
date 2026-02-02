@@ -150,7 +150,7 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
               onClick={() => setFilter('PENDING')}
               className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                 filter === 'PENDING' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' 
+                  ? 'bg-orange-50 text-white shadow-lg shadow-orange-100' 
                   : 'text-gray-400 hover:text-gray-600'
               }`}
             >

@@ -108,9 +108,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
     if (!formData.customerId) return alert('Selecione um cliente beneficiário.');
     if (!formData.solicitante) return alert('Selecione o solicitante (Usuário Chave).');
+    if (!formData.responsavelTecnico) return alert('Selecione um responsável técnico.');
 
     const selectedCustomer = customers.find(c => c.id === formData.customerId);
+    
+    // Busca os usuários Movidesk (Responsável e Criador)
     const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
+    const creatorUser = allUsers.find(u => u.id === user.id);
+    
     const settings = await getStoredIntegrations();
     
     // Busca os dados de contato do solicitante para enviar ao webhook
@@ -132,7 +137,10 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           razao_social: selectedCustomer?.razãoSocial,
           cnpj: selectedCustomer?.cnpj,
           ref_movidesk: selectedCustomer?.refMovidesk || '', 
-          usuario_movidesk: selectedTech?.usuarioMovidesk || '',
+          // Dados Movidesk solicitados
+          usuario_movidesk_criador: creatorUser?.usuarioMovidesk || user.usuarioMovidesk || '',
+          usuario_movidesk_responsavel: selectedTech?.usuarioMovidesk || '',
+          usuario_movidesk: selectedTech?.usuarioMovidesk || '', // Compatibilidade
           modulos: formData.modulos,
           tipo_treinamento: formData.tipoTreinamento,
           solicitante: formData.solicitante,
@@ -254,6 +262,25 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     setViewMode('form');
   };
 
+  const handleView = (client: Client) => {
+    setEditingId(client.id);
+    setIsViewOnly(true);
+    setFormData({
+      customerId: client.customerId,
+      protocolo: client.protocolo,
+      modulos: client.modulos,
+      tipoTreinamento: client.tipoTreinamento,
+      solicitante: client.solicitante || '',
+      duracaoHoras: client.duracaoHoras,
+      dataInicio: client.dataInicio,
+      valorImplantacao: client.valorImplantacao,
+      comissaoPercent: client.comissaoPercent,
+      responsavelTecnico: client.responsavelTecnico,
+      observacao: client.observacao || ''
+    });
+    setViewMode('form');
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setIsViewOnly(false);
@@ -319,7 +346,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
               ) : visibleClients.map(client => (
                 <tr key={client.id} className={`hover:bg-slate-50 transition-colors ${client.status === 'completed' ? 'bg-emerald-50/20' : ''}`}>
                   <td className="px-8 py-5">
-                    <p className="font-black text-slate-700 text-sm leading-tight">{client.protocolo || 'SEM PROTOCOLO'}</p>
+                    <button 
+                      onClick={() => handleView(client)}
+                      className="text-left group/protocol outline-none"
+                    >
+                      <p className="font-black text-slate-700 text-sm leading-tight group-hover/protocol:text-blue-600 group-hover/protocol:underline transition-all">
+                        {client.protocolo || 'SEM PROTOCOLO'}
+                      </p>
+                    </button>
                     <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter mt-1">{client.razãoSocial}</p>
                   </td>
                   <td className="px-8 py-5 text-center font-black text-slate-700 text-sm">{client.duracaoHoras}h</td>
@@ -438,6 +472,19 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                 </div>
               </div>
 
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-50">
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Data de Início</label>
+                    <input type="date" className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/50 transition-all" value={formData.dataInicio} onChange={e => setFormData({...formData, dataInicio: e.target.value})} required disabled={isViewOnly} />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Responsável Técnico</label>
+                    <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-blue-600 bg-slate-50/50 transition-all" value={formData.responsavelTecnico} onChange={e => setFormData({...formData, responsavelTecnico: e.target.value})} required disabled={isViewOnly}>
+                      {allUsers.filter(u => u.active !== false).map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                    </select>
+                  </div>
+              </div>
+
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-50">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Carga Horária (h)</label>
@@ -448,10 +495,11 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <input 
                       type="number" 
                       step="0.01" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-400 bg-slate-100 cursor-not-allowed" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-gray-700 bg-slate-50/50" 
                       value={formData.valorImplantacao} 
-                      readOnly 
-                      disabled
+                      onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} 
+                      required 
+                      disabled={isViewOnly}
                     />
                   </div>
                   <div>
@@ -459,10 +507,11 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <input 
                       type="number" 
                       step="1" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-400 bg-slate-100 cursor-not-allowed" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-gray-700 bg-slate-50/50" 
                       value={formData.comissaoPercent} 
-                      readOnly 
-                      disabled
+                      onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} 
+                      required 
+                      disabled={isViewOnly}
                     />
                   </div>
               </div>
