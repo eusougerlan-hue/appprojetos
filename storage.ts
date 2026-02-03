@@ -1,5 +1,5 @@
 
-import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity, BrandingConfig } from './types';
+import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity, BrandingConfig, Contact } from './types';
 import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
 /**
@@ -18,6 +18,20 @@ const brToNewline = (str: string) => {
 const newlineToBr = (str: string) => {
   if (!str) return '';
   return str.replace(/\n/g, '<br>');
+};
+
+// Garante que contatos vindos da API (que podem vir como string JSON) sejam tratados como array
+const parseContacts = (contacts: any): Contact[] => {
+  if (!contacts) return [];
+  if (typeof contacts === 'string') {
+    try {
+      const parsed = JSON.parse(contacts);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  return Array.isArray(contacts) ? contacts : [];
 };
 
 const mapUserFromDB = (db: any): User => ({
@@ -48,13 +62,13 @@ const mapCustomerFromDB = (db: any): Customer => ({
   razãoSocial: db.razao_social,
   cnpj: db.cnpj,
   refMovidesk: db.ref_movidesk || '',
-  contacts: db.contacts || []
+  contacts: parseContacts(db.contacts)
 });
 
 const mapCustomerToDB = (customer: Customer) => ({
   razao_social: customer.razãoSocial,
   cnpj: customer.cnpj,
-  ref_modivedesk: customer.refMovidesk || '',
+  ref_movidesk: customer.refMovidesk || '',
   contacts: customer.contacts || [],
   usuario_chave: customer.contacts?.some(c => c.keyUser) || false
 });
@@ -112,7 +126,7 @@ const mapLogFromDB = (db: any): TrainingLog => ({
   endTime1: db.end_time_1,
   startTime2: db.start_time_2 || '',
   endTime2: db.end_time_2 || '',
-  receivedBy: db.received_by || [],
+  receivedBy: parseContacts(db.received_by),
   observation: brToNewline(db.observation || ''),
   transportType: db.transport_type,
   uberIda: Number(db.uber_ida || 0),

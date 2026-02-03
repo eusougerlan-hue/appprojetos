@@ -31,7 +31,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   useEffect(() => {
     fetchInitialData();
-  }, [viewMode]);
+  }, [viewMode, clients]); // Atualiza se a lista de clientes mudar
 
   const pendingClients = useMemo(() => {
     let filtered = clients.filter(c => c.status === 'pending');
@@ -63,7 +63,18 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   const currentCustomer = useMemo(() => {
     if (!selectedClient) return null;
-    return allCustomers.find(cust => cust.id === selectedClient.customerId);
+    
+    // Tenta primeiro encontrar pelo ID (Link oficial)
+    let found = allCustomers.find(cust => cust.id === selectedClient.customerId);
+    
+    // Fallback: Se não encontrar pelo ID (comum em importações via API), tenta pela Razão Social
+    if (!found) {
+      found = allCustomers.find(cust => 
+        cust.razãoSocial.trim().toLowerCase() === selectedClient.razãoSocial.trim().toLowerCase()
+      );
+    }
+    
+    return found;
   }, [selectedClient, allCustomers]);
 
   const availableContacts = useMemo(() => {
@@ -457,7 +468,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
             <div className="space-y-5">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">PARTICIPANTES</label>
                 <div className="flex flex-wrap gap-2 p-8 bg-slate-50/50 rounded-[2rem] border border-slate-200 min-h-[120px] shadow-inner">
-                  {availableContacts.length === 0 ? <p className="text-[10px] text-slate-400 font-bold italic p-1">Nenhum contato cadastrado.</p> : 
+                  {availableContacts.length === 0 ? <p className="text-[10px] text-slate-400 font-bold italic p-1">Nenhum contato cadastrado na base.</p> : 
                     availableContacts.map(contact => {
                       const isSelected = formData.receivedBy.some(c => c.name === contact.name);
                       return (
