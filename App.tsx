@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserRole, ViewState, Client, TrainingLog, BrandingConfig } from './types';
-import { getStoredClients, getStoredLogs, getStoredBranding } from './storage';
+import { getStoredClients, getStoredLogs, getStoredBranding, normalizeString } from './storage';
 import { isSupabaseConfigured, getSupabase } from './supabase';
 import LoginForm from './components/LoginForm';
 import Sidebar from './components/Sidebar';
@@ -22,9 +22,6 @@ import SetupView from './components/SetupView';
 import NotificationToast from './components/NotificationToast';
 
 const SESSION_KEY = 'TM_SESSION_USER';
-
-const normalizeString = (str: string) => 
-  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {

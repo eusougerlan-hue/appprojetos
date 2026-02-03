@@ -9,6 +9,10 @@ const BRANDING_LOCAL_KEY = 'TM_BRANDING_DATA';
 const SUPABASE_URL_KEY = 'SUPABASE_URL';
 const SUPABASE_KEY_KEY = 'SUPABASE_ANON_KEY';
 
+// Utilitário global para comparação de strings (Nomes de técnicos, etc)
+export const normalizeString = (str: string | null | undefined): string => 
+  (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+
 // Funções auxiliares para tratar quebras de linha entre HTML (<br>) e Textarea (\n)
 const brToNewline = (str: string) => {
   if (!str) return '';

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Client, TransportType, TrainingLog, User, UserRole, Customer, Contact } from '../types';
-import { saveLog, updateLog, deleteLog, getStoredIntegrations, getStoredCustomers } from '../storage';
+import { saveLog, updateLog, deleteLog, getStoredIntegrations, getStoredCustomers, normalizeString } from '../storage';
 
 interface TrainingFormProps {
   clients: Client[];
@@ -14,7 +14,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAllForManager, setShowAllForManager] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -31,15 +31,17 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   useEffect(() => {
     fetchInitialData();
-  }, [viewMode, clients]); // Atualiza se a lista de clientes mudar
+  }, [viewMode, clients]);
 
   const pendingClients = useMemo(() => {
     let filtered = clients.filter(c => c.status === 'pending');
-    if (!showAllForManager && user.role !== UserRole.MANAGER) {
-      filtered = filtered.filter(c => c.responsavelTecnico === user.name);
+    if (user.role !== UserRole.MANAGER || !showAllProjects) {
+      filtered = filtered.filter(c => 
+        normalizeString(c.responsavelTecnico) === normalizeString(user.name)
+      );
     }
     return filtered;
-  }, [clients, user.name, user.role, showAllForManager]);
+  }, [clients, user.name, user.role, showAllProjects]);
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -63,17 +65,12 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   const currentCustomer = useMemo(() => {
     if (!selectedClient) return null;
-    
-    // Tenta primeiro encontrar pelo ID (Link oficial)
     let found = allCustomers.find(cust => cust.id === selectedClient.customerId);
-    
-    // Fallback: Se não encontrar pelo ID (comum em importações via API), tenta pela Razão Social
     if (!found) {
       found = allCustomers.find(cust => 
-        cust.razãoSocial.trim().toLowerCase() === selectedClient.razãoSocial.trim().toLowerCase()
+        normalizeString(cust.razãoSocial) === normalizeString(selectedClient.razãoSocial)
       );
     }
-    
     return found;
   }, [selectedClient, allCustomers]);
 
@@ -98,9 +95,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     const settings = await getStoredIntegrations();
     if (!settings.webhookUrl) return;
     
-    // CRITICAL: Force correct event names for training logs
     const eventName = isUpdate ? 'training_log_updated' : 'training_log_created';
-    
     const client = clients.find(c => c.id === log.clientId);
     try {
       const payload = {
@@ -320,10 +315,11 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
                                   <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-slate-200 transition-all">Sair</button>
                                </div>
                             ) : (
-                               <>
+                               <React.Fragment>
                                 <button onClick={() => handleEdit(log)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                                <button onClick={() => setConfirmDeleteId(log.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-all"><svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                               </>
+                                {/* Fix: Added missing double quote after className="w-5 h-5" */}
+                                <button onClick={() => setConfirmDeleteId(log.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                               </React.Fragment>
                             )}
                           </div>
                         </td>
@@ -341,22 +337,37 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   return (
     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp overflow-hidden max-w-5xl mx-auto">
-      {/* Header outside the blue box */}
-      <div className="p-10 flex justify-between items-start">
+      <div className="p-10 flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">Novo Atendimento</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">OS DADOS SERÃO SALVOS PERMANENTEMENTE NO SUPABASE.</p>
         </div>
-        <span className="px-6 py-2 bg-blue-50 text-blue-700 rounded-2xl text-[10px] font-black border border-blue-100 uppercase tracking-widest">{user.name}</span>
+        
+        <div className="flex items-center gap-4">
+          {user.role === UserRole.MANAGER && (
+            <button 
+              type="button"
+              onClick={() => setShowAllProjects(!showAllProjects)}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
+                showAllProjects ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
+              }`}
+            >
+              {showAllProjects ? 'Exibindo todos os projetos' : 'Ver todos os projetos'}
+            </button>
+          )}
+          <span className="px-6 py-2 bg-blue-50 text-blue-700 rounded-2xl text-[10px] font-black border border-blue-100 uppercase tracking-widest">{user.name}</span>
+        </div>
       </div>
       
       <form onSubmit={handleSubmit} className="px-10 pb-10 space-y-10">
-        {/* Main blue box wrapping fields */}
         <div className="border-2 border-blue-400 rounded-[2rem] p-10 space-y-10 relative">
-          
-          {/* CLIENTE ATENDIDO */}
           <div className="space-y-3">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CLIENTE ATENDIDO</label>
+            <div className="flex justify-between items-end">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CLIENTE ATENDIDO</label>
+              {pendingClients.length === 0 && (
+                <span className="text-[9px] font-bold text-red-500 uppercase italic">Nenhum protocolo seu encontrado</span>
+              )}
+            </div>
             <select
               className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-white transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center]" 
               style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2.5\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundSize: '1.2rem'}}
@@ -371,13 +382,11 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* DATA DO ATENDIMENTO */}
             <div className="space-y-3">
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">DATA DO ATENDIMENTO</label>
               <input type="date" className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-200 focus:border-blue-500 outline-none font-black text-slate-800 bg-white transition-all" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required disabled={loading} />
             </div>
 
-            {/* NÚMERO DO PROTOCOLO */}
             <div className="space-y-3">
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NÚMERO DO PROTOCOLO</label>
               <div className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-100 font-black bg-slate-50 text-slate-400 min-h-[64px] flex items-center shadow-inner">
@@ -386,7 +395,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
             </div>
           </div>
 
-          {/* HORÁRIOS DE ATENDIMENTO */}
           <div className="p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 space-y-8">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
@@ -414,7 +422,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
             </div>
           </div>
 
-          {/* LOGÍSTICA DE DESLOCAMENTO */}
           <div className="p-8 bg-indigo-50/20 rounded-[2rem] border-2 border-indigo-100/50 space-y-8">
             <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
@@ -463,7 +470,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
             </div>
           </div>
 
-          {/* PARTICIPANTES E OBSERVAÇÕES */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
             <div className="space-y-5">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">PARTICIPANTES</label>
@@ -487,11 +493,14 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
           </div>
         </div>
 
-        {/* Action buttons outside the blue box */}
         <div className="flex justify-end items-center gap-10 pt-4 px-4">
           <button type="button" onClick={() => { resetForm(); setViewMode('list'); }} className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all" disabled={loading}>CANCELAR</button>
           <button type="submit" disabled={loading} className="px-24 py-6 bg-blue-600 text-white font-black rounded-[1.5rem] shadow-2xl shadow-blue-200 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50 flex items-center gap-4 uppercase tracking-[0.2em] text-[11px]">
-            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : (editingLogId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR ATENDIMENTO')}
+            {loading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+            ) : (
+              editingLogId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR ATENDIMENTO'
+            )}
           </button>
         </div>
       </form>

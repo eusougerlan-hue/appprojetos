@@ -112,18 +112,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
     const selectedCustomer = customers.find(c => c.id === formData.customerId);
     
-    // Busca os usuários Movidesk (Responsável e Criador)
     const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
     const creatorUser = allUsers.find(u => u.id === user.id);
     
     const settings = await getStoredIntegrations();
-    
-    // Busca os dados de contato do solicitante para enviar ao webhook
     const solicitanteContact = keyUsers.find(c => c.name === formData.solicitante);
     
     let finalProtocol = formData.protocolo;
 
-    // ETAPA 1: GERAÇÃO DE PROTOCOLO VIA N8N
     if (!editingId || !formData.protocolo) {
       if (!settings.webhookUrl) {
         return alert('ERRO: Configure o Webhook do n8n nas Integrações Cloud para gerar protocolos Movidesk.');
@@ -137,10 +133,9 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           razao_social: selectedCustomer?.razãoSocial,
           cnpj: selectedCustomer?.cnpj,
           ref_movidesk: selectedCustomer?.refMovidesk || '', 
-          // Dados Movidesk solicitados
           usuario_movidesk_criador: creatorUser?.usuarioMovidesk || user.usuarioMovidesk || '',
           usuario_movidesk_responsavel: selectedTech?.usuarioMovidesk || '',
-          usuario_movidesk: selectedTech?.usuarioMovidesk || '', // Compatibilidade
+          usuario_movidesk: selectedTech?.usuarioMovidesk || '', 
           modulos: formData.modulos,
           tipo_treinamento: formData.tipoTreinamento,
           solicitante: formData.solicitante,
@@ -180,7 +175,6 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       }
     }
 
-    // ETAPA 2: SALVAMENTO NO SUPABASE (Sincronizado)
     setLoading(true);
     setGeneratingProtocol(false);
 
@@ -490,28 +484,27 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Carga Horária (h)</label>
                     <input type="number" step="0.5" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
-                  <div>
+                  {/* Campos BLOQUEADOS para preenchimento manual, permitindo apenas exibição/recebimento via API */}
+                  <div className="opacity-60 grayscale-[0.5]">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Valor Contrato (R$)</label>
                     <input 
                       type="number" 
                       step="0.01" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-gray-700 bg-slate-50/50" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-slate-400 bg-slate-100 cursor-not-allowed" 
                       value={formData.valorImplantacao} 
-                      onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} 
-                      required 
-                      disabled={isViewOnly}
+                      readOnly 
+                      placeholder="Bloqueado"
                     />
                   </div>
-                  <div>
+                  <div className="opacity-60 grayscale-[0.5]">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Comissão (%)</label>
                     <input 
                       type="number" 
                       step="1" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-gray-700 bg-slate-50/50" 
+                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-slate-400 bg-slate-100 cursor-not-allowed" 
                       value={formData.comissaoPercent} 
-                      onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} 
-                      required 
-                      disabled={isViewOnly}
+                      readOnly 
+                      placeholder="Bloqueado"
                     />
                   </div>
               </div>

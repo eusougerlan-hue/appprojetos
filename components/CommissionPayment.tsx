@@ -19,6 +19,8 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
 
   const commissions = useMemo(() => {
     return completedClients
+      // REGRA: Só exibe na tela de comissão se houver valor de contrato e percentual de comissão (vindos da API)
+      .filter(c => (c.valorImplantacao || 0) > 0 && (c.comissaoPercent || 0) > 0)
       .map(client => ({
         ...client,
         commissionValue: (client.valorImplantacao * client.comissaoPercent) / 100
@@ -38,25 +40,27 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
     }), { pending: 0, paid: 0 });
   }, [commissions]);
 
-  // Cálculo de comissões agrupadas por funcionário apenas para treinamentos finalizados
+  // Cálculo de comissões agrupadas por funcionário apenas para treinamentos finalizados e monetizados
   const employeeTotals = useMemo(() => {
     const grouped: Record<string, { pending: number; paid: number; clientCount: number }> = {};
     
-    completedClients.forEach(client => {
-      const emp = client.responsavelTecnico;
-      const value = (client.valorImplantacao * client.comissaoPercent) / 100;
-      
-      if (!grouped[emp]) {
-        grouped[emp] = { pending: 0, paid: 0, clientCount: 0 };
-      }
-      
-      if (client.commissionPaid) {
-        grouped[emp].paid += value;
-      } else {
-        grouped[emp].pending += value;
-      }
-      grouped[emp].clientCount += 1;
-    });
+    completedClients
+      .filter(c => (c.valorImplantacao || 0) > 0 && (c.comissaoPercent || 0) > 0)
+      .forEach(client => {
+        const emp = client.responsavelTecnico;
+        const value = (client.valorImplantacao * client.comissaoPercent) / 100;
+        
+        if (!grouped[emp]) {
+          grouped[emp] = { pending: 0, paid: 0, clientCount: 0 };
+        }
+        
+        if (client.commissionPaid) {
+          grouped[emp].paid += value;
+        } else {
+          grouped[emp].pending += value;
+        }
+        grouped[emp].clientCount += 1;
+      });
     
     return Object.entries(grouped)
       .map(([name, data]) => ({ name, ...data }))
@@ -82,7 +86,7 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Gestão de Pagamento de Comissões</h2>
-          <p className="text-sm text-gray-500">Liberação de comissões para treinamentos <strong>finalizados</strong>.</p>
+          <p className="text-sm text-gray-500">Liberação de comissões para treinamentos <strong>finalizados</strong> e com valores definidos via API.</p>
         </div>
 
         <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-100 shadow-sm">
@@ -117,6 +121,16 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
             As comissões só aparecem aqui após o responsável técnico marcar o treinamento como <strong>"Finalizado"</strong> na tela de Gestão de Horas.
           </p>
         </div>
+      ) : commissions.length === 0 && completedClients.length > 0 ? (
+        <div className="bg-blue-50 border border-blue-200 p-8 rounded-2xl text-center">
+          <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <h3 className="text-lg font-bold text-blue-800">Nenhuma comissão monetizada encontrada</h3>
+          <p className="text-blue-600 max-w-md mx-auto mt-2 text-sm leading-relaxed">
+            Existem treinamentos finalizados, porém eles não possuem <strong>Valor de Contrato</strong> ou <strong>Percentual de Comissão</strong> definidos (geralmente inseridos via API).
+          </p>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -140,17 +154,16 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
             </div>
           </div>
 
-          {/* Resumo por Funcionário */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 bg-gray-50/50 border-b border-gray-100">
               <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                Resumo de Comissões por Funcionário (Treinamentos Finalizados)
+                Resumo de Comissões por Funcionário (Apenas com valor definido)
               </h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-100">
               {employeeTotals.length === 0 ? (
-                <div className="bg-white p-6 text-center text-gray-400 text-xs italic md:col-span-3">Nenhum funcionário com treinamentos finalizados.</div>
+                <div className="bg-white p-6 text-center text-gray-400 text-xs italic md:col-span-3">Nenhum funcionário com comissões monetizadas.</div>
               ) : (
                 employeeTotals.map((emp) => (
                   <div key={emp.name} className="bg-white p-4 hover:bg-blue-50/30 transition-colors">
@@ -161,7 +174,7 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
                         </div>
                         <div>
                           <p className="font-black text-gray-800 text-sm leading-tight">{emp.name}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase">{emp.clientCount} {emp.clientCount === 1 ? 'finalizado' : 'finalizados'}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">{emp.clientCount} {emp.clientCount === 1 ? 'projeto' : 'projetos'}</p>
                         </div>
                       </div>
                     </div>
@@ -248,7 +261,7 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
       <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-start gap-3">
         <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         <p className="text-xs text-gray-500 leading-relaxed italic">
-          As comissões são baseadas no percentual definido no cadastro do cliente. Esta tela serve para o gestor financeiro controlar quais valores já foram repassados aos funcionários responsáveis técnicos pelas implantações <strong>concluídas</strong>.
+          As comissões são baseadas no percentual definido no cadastro do cliente vindo da API. Esta tela serve para o gestor financeiro controlar quais valores já foram repassados aos funcionários responsáveis técnicos pelas implantações <strong>concluídas</strong> e monetizadas.
         </p>
       </div>
     </div>
