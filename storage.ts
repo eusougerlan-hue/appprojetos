@@ -9,6 +9,17 @@ const BRANDING_LOCAL_KEY = 'TM_BRANDING_DATA';
 const SUPABASE_URL_KEY = 'SUPABASE_URL';
 const SUPABASE_KEY_KEY = 'SUPABASE_ANON_KEY';
 
+// Funções auxiliares para tratar quebras de linha entre HTML (<br>) e Textarea (\n)
+const brToNewline = (str: string) => {
+  if (!str) return '';
+  return str.replace(/<br\s*\/?>/gi, '\n');
+};
+
+const newlineToBr = (str: string) => {
+  if (!str) return '';
+  return str.replace(/\n/g, '<br>');
+};
+
 const mapUserFromDB = (db: any): User => ({
   id: db.id,
   name: db.name,
@@ -36,7 +47,6 @@ const mapCustomerFromDB = (db: any): Customer => ({
   id: db.id,
   razãoSocial: db.razao_social,
   cnpj: db.cnpj,
-  // Fix: changed 'ref_movidesk' to 'refMovidesk' to match the Customer interface
   refMovidesk: db.ref_movidesk || '',
   contacts: db.contacts || []
 });
@@ -44,7 +54,7 @@ const mapCustomerFromDB = (db: any): Customer => ({
 const mapCustomerToDB = (customer: Customer) => ({
   razao_social: customer.razãoSocial,
   cnpj: customer.cnpj,
-  ref_movidesk: customer.refMovidesk || '',
+  ref_modivedesk: customer.refMovidesk || '',
   contacts: customer.contacts || [],
   usuario_chave: customer.contacts?.some(c => c.keyUser) || false
 });
@@ -66,7 +76,7 @@ const mapClientFromDB = (db: any): Client => ({
   status: db.status,
   responsavelTecnico: db.responsavel_tecnico || '',
   commissionPaid: db.commission_paid || false,
-  observacao: db.observacao || ''
+  observacao: brToNewline(db.observacao || '')
 });
 
 const mapClientToDB = (client: Client) => {
@@ -86,7 +96,7 @@ const mapClientToDB = (client: Client) => {
     status: client.status,
     responsavel_tecnico: client.responsavelTecnico,
     commission_paid: client.commissionPaid || false,
-    observacao: client.observacao || ''
+    observacao: newlineToBr(client.observacao || '')
   };
   return data;
 };
@@ -103,7 +113,7 @@ const mapLogFromDB = (db: any): TrainingLog => ({
   startTime2: db.start_time_2 || '',
   endTime2: db.end_time_2 || '',
   receivedBy: db.received_by || [],
-  observation: db.observation || '',
+  observation: brToNewline(db.observation || ''),
   transportType: db.transport_type,
   uberIda: Number(db.uber_ida || 0),
   uberVolta: Number(db.uber_volta || 0),
@@ -117,7 +127,6 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 
 const mapLogToDB = (log: TrainingLog) => ({
   client_id: log.clientId,
-  // Fix: changed 'log.numero_protocolo' to 'log.numeroProtocolo' to match TrainingLog interface
   numero_protocolo: log.numeroProtocolo,
   employee_id: log.employeeId,
   employee_name: log.employeeName,
@@ -127,7 +136,7 @@ const mapLogToDB = (log: TrainingLog) => ({
   start_time_2: log.startTime2 || null,
   end_time_2: log.endTime2 || null,
   received_by: log.receivedBy || [],
-  observation: log.observation,
+  observation: newlineToBr(log.observation),
   transport_type: log.transportType,
   uber_ida: log.uberIda,
   uber_volta: log.uberVolta,
@@ -302,9 +311,6 @@ export const deleteTrainingType = async (id: string) => {
 
 // --- INTEGRATIONS & BRANDING UNIFICADOS NO ID 1 ---
 
-/**
- * Lê a configuração centralizada (ID 1)
- */
 const getCentralConfig = async () => {
   try {
     const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
@@ -401,9 +407,6 @@ export const saveBranding = async (config: BrandingConfig) => {
   return true;
 };
 
-/**
- * Recupera URL/Key do Supabase salvos no banco (ID 2) caso o localStorage suma
- */
 export const getStoredCloudConfig = async () => {
   try {
     const { data, error } = await supabase.from('integrations').select('*').eq('id', 2).single();
@@ -421,7 +424,6 @@ export const saveCloudConfigToDB = async (url: string, key: string) => {
   try {
     resetSupabaseClient();
     localStorage.setItem(SUPABASE_URL_KEY, url);
-    // Fix: Using SUPABASE_KEY_KEY constant instead of undefined SUPABASE_ANON_KEY
     localStorage.setItem(SUPABASE_KEY_KEY, key);
     
     const client = getSupabase();
