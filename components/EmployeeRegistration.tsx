@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
-import { getStoredUsers, saveUser, updateUser, deleteUser } from '../storage';
+import { User, UserRole, Client } from '../types';
+import { getStoredUsers, saveUser, updateUser, deleteUser, getStoredClients, normalizeString } from '../storage';
 
 interface EmployeeRegistrationProps {
   onComplete: () => void;
@@ -10,11 +10,12 @@ interface EmployeeRegistrationProps {
 const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete }) => {
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
   const [users, setUsers] = useState<User[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
-  // Identificação do usuário atual para impedir que ele se exclua (vulnerabilidade de segurança)
+  // Identificação do usuário atual para impedir que ele se exclua
   const currentUserJson = localStorage.getItem('TM_SESSION_USER');
   const currentUserId = currentUserJson ? JSON.parse(currentUserJson).id : null;
   
@@ -29,13 +30,17 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
     usuarioMovidesk: ''
   });
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await getStoredUsers();
-      setUsers(data);
+      const [usersData, clientsData] = await Promise.all([
+        getStoredUsers(),
+        getStoredClients()
+      ]);
+      setUsers(usersData);
+      setClients(clientsData);
     } catch (err) {
-      alert('Erro ao carregar funcionários.');
+      alert('Erro ao carregar dados dos funcionários e projetos.');
     } finally {
       setLoading(false);
     }
@@ -43,7 +48,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
 
   useEffect(() => {
     if (viewMode === 'list') {
-      fetchUsers();
+      fetchData();
     }
   }, [viewMode]);
 
@@ -68,7 +73,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
       active: !user.active
     };
     await updateUser(updated);
-    fetchUsers();
+    fetchData();
   };
 
   const handleAddNew = () => {
@@ -86,23 +91,35 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
     setViewMode('form');
   };
 
-  const handleDelete = async (id: string) => {
-    if (id === currentUserId) {
-      alert('AÇÃO BLOQUEADA: Você não pode excluir sua própria conta enquanto estiver logado.');
+  const handleDelete = async (userToDelete: User) => {
+    if (userToDelete.id === currentUserId) {
+      alert('AÇÃO BLOQUEADA: Você não pode excluir sua própria conta administrativa enquanto estiver logado.');
+      setConfirmDeleteId(null);
+      return;
+    }
+
+    // Validação de vínculo: Verifica se o nome do funcionário consta como responsável em algum contrato
+    const hasLinkedSales = clients.some(client => 
+      normalizeString(client.responsavelTecnico) === normalizeString(userToDelete.name)
+    );
+
+    if (hasLinkedSales) {
+      alert(`BLOQUEIO DE SEGURANÇA: Não é possível excluir "${userToDelete.name}" porque existem vendas/contratos de treinamento vinculados a este Responsável Técnico.\n\nSugestão: Altere o responsável nos contratos ou apenas desative este funcionário.`);
       setConfirmDeleteId(null);
       return;
     }
 
     setLoading(true);
     try {
-      await deleteUser(id);
+      await deleteUser(userToDelete.id);
       setConfirmDeleteId(null);
-      fetchUsers();
+      fetchData();
     } catch (err: any) {
+      // Fallback para erro de banco (FK no Supabase se existir)
       if (err.message && err.message.includes('foreign key')) {
-        alert('Não é possível excluir: este funcionário possui registros vinculados (vendas ou atendimentos). Desative-o em vez de excluir.');
+        alert('Erro de integridade: este funcionário possui registros históricos no banco de dados. Recomendamos apenas desativar o cadastro.');
       } else {
-        alert('Erro ao excluir funcionário.');
+        alert('Erro ao excluir funcionário. Verifique sua conexão.');
       }
     } finally {
       setLoading(false);
@@ -137,88 +154,99 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
 
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Equipe de Funcionários</h2>
-            <p className="text-sm text-gray-500">Gestão centralizada no Supabase.</p>
+            <h2 className="text-xl font-bold text-gray-800 tracking-tight">Equipe de Funcionários</h2>
+            <p className="text-sm text-gray-500 font-medium">Gestão centralizada de instrutores e administradores.</p>
           </div>
           <button 
             onClick={handleAddNew}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-md active:scale-95 flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-100 active:scale-95 flex items-center gap-2 uppercase tracking-widest"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
             </svg>
             Novo Funcionário
           </button>
         </div>
 
-        <div className="overflow-x-auto min-h-[200px]">
+        <div className="overflow-x-auto min-h-[300px]">
           {loading && users.length === 0 ? (
-            <div className="flex justify-center items-center p-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="flex justify-center items-center p-20">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <table className="w-full text-left">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50/50">
                 <tr>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Nome / Cargo</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">CPF (Login)</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">E-mail / Telefone</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Ativo</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Ação</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome / Cargo</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">CPF (Login)</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Contato</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ativo</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {users.map((user) => (
-                  <tr key={user.id} className={`hover:bg-gray-50 transition-colors ${user.active === false ? 'opacity-60 bg-gray-50/50' : ''}`}>
+                {users.map((u) => (
+                  <tr key={u.id} className={`hover:bg-blue-50/20 transition-colors ${u.active === false ? 'opacity-60 bg-gray-50/50' : ''}`}>
                     <td className="px-6 py-4">
-                      <p className={`font-bold ${user.active === false ? 'text-gray-400' : 'text-gray-800'}`}>{user.name}</p>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
-                        user.role === UserRole.MANAGER 
-                          ? (user.active === false ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-blue-50 text-blue-600 border-blue-100')
+                      <p className={`font-black text-sm ${u.active === false ? 'text-gray-400' : 'text-gray-800'}`}>{u.name}</p>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border mt-1 inline-block ${
+                        u.role === UserRole.MANAGER 
+                          ? (u.active === false ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-blue-50 text-blue-600 border-blue-100')
                           : 'bg-gray-50 text-gray-500 border-gray-200'
                       }`}>
-                        {user.role === UserRole.MANAGER ? 'Administrador' : 'Funcionário'}
+                        {u.role === UserRole.MANAGER ? 'Administrador' : 'Instrutor'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 font-medium">
-                      {user.cpf}
+                    <td className="px-6 py-4 text-xs font-bold text-gray-600">
+                      {u.cpf}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      <p className="font-medium text-gray-700">{user.email}</p>
-                      <p className="text-xs text-gray-400">{user.phone}</p>
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-bold text-gray-700">{u.email}</p>
+                      <p className="text-[10px] text-gray-400 font-medium">{u.phone}</p>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <input
                         type="checkbox"
-                        checked={user.active !== false}
-                        onChange={() => handleToggleStatus(user)}
-                        className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                        checked={u.active !== false}
+                        onChange={() => handleToggleStatus(u)}
+                        className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500 cursor-pointer transition-all"
                       />
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 items-center">
-                        {confirmDeleteId === user.id ? (
+                        {confirmDeleteId === u.id ? (
                            <div className="flex items-center gap-1 animate-fadeIn">
-                             <button onClick={() => handleDelete(user.id)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-red-700 shadow-sm transition-all">Apagar?</button>
-                             <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-slate-200 transition-all">Sair</button>
+                             <button 
+                               onClick={() => handleDelete(u)} 
+                               className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter hover:bg-red-700 shadow-lg shadow-red-100 transition-all"
+                             >
+                               Apagar?
+                             </button>
+                             <button 
+                               onClick={() => setConfirmDeleteId(null)} 
+                               className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter hover:bg-slate-200 transition-all"
+                             >
+                               Sair
+                             </button>
                            </div>
                         ) : (
                           <>
                             <button 
-                              onClick={() => handleEdit(user)}
-                              className="text-blue-600 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-lg text-xs font-black transition-all border border-blue-100 uppercase"
+                              onClick={() => handleEdit(u)}
+                              className="text-blue-600 hover:bg-blue-50 p-2 rounded-xl text-xs font-black transition-all uppercase"
+                              title="Editar funcionário"
                             >
-                              Editar
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
                             <button 
-                              onClick={() => setConfirmDeleteId(user.id)}
-                              className="text-red-500 hover:text-white hover:bg-red-600 px-2 py-1.5 rounded-lg transition-all border border-red-100"
-                              title="Excluir funcionário"
+                              onClick={() => setConfirmDeleteId(u.id)}
+                              className="text-red-400 hover:bg-red-50 p-2 rounded-xl transition-all"
+                              title="Excluir cadastro"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
@@ -233,12 +261,12 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           )}
         </div>
         
-        <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+        <div className="p-8 border-t border-gray-100 bg-gray-50/30 flex justify-end">
            <button
             onClick={onComplete}
-            className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest"
+            className="text-[10px] font-black text-gray-400 hover:text-gray-600 uppercase tracking-[0.2em] transition-all"
           >
-            Fechar Gestão
+            FECHAR GESTÃO
           </button>
         </div>
       </div>
@@ -246,28 +274,28 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-slideIn max-w-2xl mx-auto overflow-hidden">
-      <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+    <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 animate-slideUp max-w-2xl mx-auto overflow-hidden">
+      <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 tracking-tight">
-            {editingUser ? 'Editar Funcionário' : 'Cadastrar Novo Funcionário'}
+          <h2 className="text-2xl font-black text-gray-800 tracking-tight">
+            {editingUser ? 'Editar Funcionário' : 'Novo Funcionário'}
           </h2>
-          <p className="text-sm text-gray-500 font-medium">Sincronizado com Supabase.</p>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-1">Sincronizado via Supabase Cloud</p>
         </div>
-        <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100 shadow-sm">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 01-8 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
       </div>
       
-      <form onSubmit={handleSubmit} className="p-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nome Completo</label>
+      <form onSubmit={handleSubmit} className="p-10 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome Completo</label>
             <input
               type="text"
-              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/30 transition-all"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
               required
@@ -275,11 +303,11 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
               placeholder="Nome do colaborador"
             />
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">E-mail Corporativo</label>
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
             <input
               type="email"
-              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/30 transition-all"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               placeholder="exemplo@empresa.com"
@@ -289,12 +317,12 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Telefone</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Telefone / WhatsApp</label>
             <input
               type="text"
-              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/30 transition-all"
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value})}
               placeholder="(00) 00000-0000"
@@ -302,11 +330,11 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
               disabled={loading}
             />
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">CPF (Login)</label>
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CPF (Login do Sistema)</label>
             <input
               type="text"
-              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/30 transition-all"
               value={formData.cpf}
               onChange={(e) => setFormData({...formData, cpf: e.target.value})}
               placeholder="000.000.000-00"
@@ -316,34 +344,34 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Senha {editingUser ? '(Opcional)' : 'Provisória'}</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Senha de Acesso</label>
             <input
               type="password"
-              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all focus:ring-4 focus:ring-blue-500/10"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/30 transition-all"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               required={!editingUser}
-              placeholder={editingUser ? "Deixe em branco para não alterar" : "••••••••"}
+              placeholder={editingUser ? "Manter senha atual" : "Crie uma senha"}
               disabled={loading}
             />
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 ml-1">Usuário Movidesk</label>
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">Usuário Movidesk</label>
             <input
               type="text"
-              className="w-full px-5 py-3 rounded-xl border border-blue-100 focus:border-blue-500 outline-none font-bold text-blue-600 bg-blue-50/10 transition-all focus:ring-4 focus:ring-blue-500/10"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-blue-50 focus:border-blue-500 outline-none font-bold text-blue-600 bg-blue-50/20 transition-all"
               value={formData.usuarioMovidesk}
               onChange={(e) => setFormData({...formData, usuarioMovidesk: e.target.value})}
-              placeholder="Usuário Movidesk"
+              placeholder="Ex: joao.tecnico"
               disabled={loading}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-2">
-          <div className="flex items-center gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center pt-4 border-t border-slate-50">
+          <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl">
             <input
               type="checkbox"
               id="user-active"
@@ -352,41 +380,41 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
               className="w-6 h-6 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500 cursor-pointer transition-all"
               disabled={loading}
             />
-            <label htmlFor="user-active" className="text-sm font-bold text-gray-700 cursor-pointer select-none">
-              Usuário Ativo
+            <label htmlFor="user-active" className="text-sm font-black text-gray-700 cursor-pointer select-none">
+              Acesso Habilitado
             </label>
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Cargo</label>
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Perfil de Acesso</label>
             <select
-              className="w-full px-5 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50/30 transition-all"
+              className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-gray-700 bg-white transition-all appearance-none"
               value={formData.role}
               onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})}
               disabled={loading}
             >
-              <option value={UserRole.EMPLOYEE}>Funcionário / Instrutor</option>
-              <option value={UserRole.MANAGER}>Gestor / Administrador</option>
+              <option value={UserRole.EMPLOYEE}>Instrutor / Consultor Técnico</option>
+              <option value={UserRole.MANAGER}>Gestor / Administrador Master</option>
             </select>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-8 border-t border-gray-100">
+        <div className="flex justify-end gap-4 pt-10 border-t border-gray-100">
           <button
             type="button"
             onClick={() => setViewMode('list')}
-            className="px-6 py-3 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-gray-600 transition-all rounded-xl"
+            className="px-8 py-4 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-gray-600 transition-all rounded-2xl"
             disabled={loading}
           >
-            Voltar para Lista
+            CANCELAR
           </button>
           <button
             type="submit"
             disabled={loading}
-            className={`px-10 py-3 rounded-xl shadow-xl transition-all font-black text-[10px] uppercase tracking-widest text-white flex items-center justify-center min-w-[180px] active:scale-95 ${
+            className={`px-16 py-4 rounded-[1.5rem] shadow-2xl transition-all font-black text-[10px] uppercase tracking-widest text-white flex items-center justify-center min-w-[220px] active:scale-95 ${
               editingUser ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
             }`}
           >
-            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : (editingUser ? 'Salvar Alterações' : 'Cadastrar Funcionário')}
+            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : (editingUser ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR CADASTRO')}
           </button>
         </div>
       </form>

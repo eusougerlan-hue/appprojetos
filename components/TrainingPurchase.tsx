@@ -23,6 +23,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const [generatingProtocol, setGeneratingProtocol] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
+  const isManager = user.role === UserRole.MANAGER;
+
   const [formData, setFormData] = useState({
     customerId: '',
     protocolo: '',
@@ -71,14 +73,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
   const visibleClients = useMemo(() => {
     let list = [...allClients];
-    if (user.role !== UserRole.MANAGER) {
+    if (!isManager) {
       list = list.filter(client => client.responsavelTecnico === user.name);
     }
     if (searchTerm.trim()) {
       list = list.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
     }
     return list;
-  }, [allClients, user, searchTerm]);
+  }, [allClients, user, searchTerm, isManager]);
 
   const keyUsers = useMemo(() => {
     if (!formData.customerId) return [];
@@ -110,21 +112,25 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     if (!formData.solicitante) return alert('Selecione o solicitante (Usuário Chave).');
     if (!formData.responsavelTecnico) return alert('Selecione um responsável técnico.');
 
-    const selectedCustomer = customers.find(c => c.id === formData.customerId);
+    const settings = await getStoredIntegrations();
     
+    // Verificação Crítica: Integração precisa estar configurada para novas vendas
+    if (!editingId && !formData.protocolo) {
+      if (!settings.webhookUrl || !settings.apiKey) {
+        return alert('ERRO DE CONFIGURAÇÃO: O sistema está configurado para gerar protocolos via Integração Cloud. Por favor, vá em "Configurações > Integrações Cloud" e configure a URL do Webhook e a API Key antes de cadastrar uma nova venda.');
+      }
+    }
+
+    const selectedCustomer = customers.find(c => c.id === formData.customerId);
+    // IMPORTANTE: Busca o técnico selecionado no FORM (que pode ser o João, se o Gestor mudou)
     const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
     const creatorUser = allUsers.find(u => u.id === user.id);
-    
-    const settings = await getStoredIntegrations();
     const solicitanteContact = keyUsers.find(c => c.name === formData.solicitante);
     
     let finalProtocol = formData.protocolo;
 
-    if (!editingId || !formData.protocolo) {
-      if (!settings.webhookUrl) {
-        return alert('ERRO: Configure o Webhook do n8n nas Integrações Cloud para gerar protocolos Movidesk.');
-      }
-
+    // Lógica de Protocolo OBRIGATÓRIA via Integração
+    if (!editingId && !formData.protocolo) {
       setGeneratingProtocol(true);
       try {
         const payload = {
@@ -134,6 +140,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           cnpj: selectedCustomer?.cnpj,
           ref_movidesk: selectedCustomer?.refMovidesk || '', 
           usuario_movidesk_criador: creatorUser?.usuarioMovidesk || user.usuarioMovidesk || '',
+          // Envia o usuário movidesk do técnico ESCOLHIDO no dropdown
           usuario_movidesk_responsavel: selectedTech?.usuarioMovidesk || '',
           usuario_movidesk: selectedTech?.usuarioMovidesk || '', 
           modulos: formData.modulos,
@@ -155,29 +162,31 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         });
 
         if (!response.ok) {
-           const errorBody = await response.text();
-           console.error('Erro n8n:', errorBody);
-           throw new Error(`O n8n retornou erro ${response.status}.`);
+          throw new Error(`Servidor de Integração retornou erro ${response.status}`);
         }
-        
+
         const rawData = await response.json();
         const data = Array.isArray(rawData) ? rawData[0] : rawData;
         
         if (data && data.protocolo) {
           finalProtocol = data.protocolo;
-          setFormData(prev => ({ ...prev, protocolo: data.protocolo }));
         } else {
-          throw new Error('O n8n não retornou a chave "protocolo".');
+          throw new Error('A integração n8n não retornou o campo "protocolo" esperado.');
         }
       } catch (err: any) {
         setGeneratingProtocol(false);
-        return alert(`FALHA NA INTEGRAÇÃO MOVIDESK:\n${err.message || 'Erro ao comunicar com n8n.'}`);
+        return alert(`FALHA NA INTEGRAÇÃO: Não foi possível gerar o protocolo no Movidesk.\n\nDetalhes: ${err.message}\n\nA venda não foi salva. Verifique o log do n8n.`);
+      } finally {
+        setGeneratingProtocol(false);
       }
     }
 
-    setLoading(true);
-    setGeneratingProtocol(false);
+    // Se chegou aqui e não tem protocolo (em caso de nova venda), algo deu muito errado no fluxo acima
+    if (!editingId && !finalProtocol) {
+      return alert('ERRO CRÍTICO: O número do protocolo é obrigatório e não foi gerado pela integração.');
+    }
 
+    setLoading(true);
     try {
       const clientData: Client = {
         id: editingId || Math.random().toString(36).substr(2, 9), 
@@ -207,7 +216,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       onComplete(); 
     } catch (err: any) {
       console.error('Erro ao salvar no Supabase:', err);
-      alert(`ERRO AO SALVAR NO SUPABASE:\n${err.message}`);
+      alert(`ERRO AO SALVAR NO BANCO: ${err.message || 'Verifique sua conexão.'}`);
     } finally {
       setLoading(false);
     }
@@ -289,7 +298,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       dataInicio: new Date().toISOString().split('T')[0],
       valorImplantacao: 0,
       comissaoPercent: 0,
-      responsavelTecnico: user.name,
+      responsavelTecnico: user.name, // Por padrão, o técnico logado
       observacao: ''
     });
   };
@@ -393,7 +402,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                  {generatingProtocol ? 'Sincronizando com Movidesk via n8n...' : 'Persistindo dados no Supabase...'}
                </h3>
                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] px-10 leading-relaxed">
-                 Aguarde a geração do protocolo e o salvamento automático.
+                 {generatingProtocol ? 'Aguardando geração do protocolo oficial...' : 'Salvando venda na base de dados...'}
                </p>
             </div>
           </div>
@@ -404,7 +413,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
                 {isViewOnly ? 'Visualizar Venda' : editingId ? 'Editar Contrato' : 'Nova Venda de Treinamento'}
               </h2>
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2">Sincronização Cloud Ativada</p>
+              <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2">Protocolo Automático Ativado</p>
             </div>
             <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
@@ -423,7 +432,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Número do Protocolo</label>
-                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-blue-600 bg-slate-100 cursor-not-allowed" value={formData.protocolo} readOnly placeholder="Ex: 202601004476 (Auto)" />
+                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-blue-600 bg-slate-100 cursor-not-allowed" value={formData.protocolo} readOnly placeholder="Aguardando integração..." />
+                <p className="text-[9px] text-gray-400 mt-2 ml-1 italic font-bold">* Gerado via Movidesk após clicar em confirmar.</p>
               </div>
 
               <div>
@@ -447,7 +457,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <option key={idx} value={contact.name}>{contact.name}</option>
                   ))}
                   {formData.customerId && keyUsers.length === 0 && (
-                    <option disabled value="">Nenhum Usuário Chave cadastrado para este cliente</option>
+                    <option disabled value="">⚠️ Nenhum Usuário Chave cadastrado para este cliente</option>
                   )}
                 </select>
               </div>
@@ -458,7 +468,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                    {availableModules.map(mod => {
                      const active = formData.modulos.includes(mod.name);
                      return (
-                       <button key={mod.id} type="button" onClick={() => toggleModule(mod.name)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black border transition-all ${active ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-300'}`} disabled={isViewOnly}>
+                       <button key={mod.id} type="button" onClick={() => toggleModule(mod.name)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black border transition-all ${active ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400'}`} disabled={isViewOnly}>
                          {mod.name}
                        </button>
                      );
@@ -473,9 +483,20 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                   </div>
                   <div className="space-y-3">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Responsável Técnico</label>
-                    <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-blue-600 bg-slate-50/50 transition-all" value={formData.responsavelTecnico} onChange={e => setFormData({...formData, responsavelTecnico: e.target.value})} required disabled={isViewOnly}>
+                    <select 
+                      className={`w-full px-6 py-4 rounded-2xl border-2 outline-none font-bold transition-all appearance-none ${
+                        !isManager && !isViewOnly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-50/50 border-slate-200 focus:border-blue-500 text-blue-600'
+                      }`}
+                      value={formData.responsavelTecnico} 
+                      onChange={e => setFormData({...formData, responsavelTecnico: e.target.value})} 
+                      required 
+                      disabled={isViewOnly || !isManager}
+                    >
                       {allUsers.filter(u => u.active !== false).map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                     </select>
+                    {!isManager && !isViewOnly && (
+                      <p className="text-[9px] text-gray-400 mt-1 ml-1 italic font-bold">Apenas gestores podem alterar o responsável técnico.</p>
+                    )}
                   </div>
               </div>
 
@@ -484,7 +505,6 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Carga Horária (h)</label>
                     <input type="number" step="0.5" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly} />
                   </div>
-                  {/* Campos BLOQUEADOS para preenchimento manual, permitindo apenas exibição/recebimento via API */}
                   <div className="opacity-60 grayscale-[0.5]">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Valor Contrato (R$)</label>
                     <input 
@@ -521,7 +541,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                </button>
                {!isViewOnly && (
                  <button type="submit" disabled={generatingProtocol || loading} className="px-16 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-2xl shadow-blue-100 transition-all active:scale-95 uppercase tracking-widest text-[10px]">
-                   {editingId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR VENDA'}
+                   {loading ? 'SALVANDO...' : generatingProtocol ? 'GERANDO PROTOCOLO...' : editingId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR E GERAR PROTOCOLO'}
                  </button>
                )}
             </div>
