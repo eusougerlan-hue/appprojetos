@@ -185,6 +185,13 @@ export const updateUser = async (user: User) => {
   return true;
 };
 
+export const deleteUser = async (id: string) => {
+  const client = getSupabase();
+  const { error } = await client.from('users').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+};
+
 // --- CUSTOMERS ---
 export const getStoredCustomers = async (): Promise<Customer[]> => {
   const { data, error } = await supabase.from('customers').select('*').order('razao_social');

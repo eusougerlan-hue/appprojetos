@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { getStoredUsers, saveUser, updateUser } from '../storage';
+import { getStoredUsers, saveUser, updateUser, deleteUser } from '../storage';
 
 interface EmployeeRegistrationProps {
   onComplete: () => void;
@@ -12,6 +12,11 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  
+  // Identificação do usuário atual para impedir que ele se exclua (vulnerabilidade de segurança)
+  const currentUserJson = localStorage.getItem('TM_SESSION_USER');
+  const currentUserId = currentUserJson ? JSON.parse(currentUserJson).id : null;
   
   const [formData, setFormData] = useState({
     name: '',
@@ -81,6 +86,29 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
     setViewMode('form');
   };
 
+  const handleDelete = async (id: string) => {
+    if (id === currentUserId) {
+      alert('AÇÃO BLOQUEADA: Você não pode excluir sua própria conta enquanto estiver logado.');
+      setConfirmDeleteId(null);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await deleteUser(id);
+      setConfirmDeleteId(null);
+      fetchUsers();
+    } catch (err: any) {
+      if (err.message && err.message.includes('foreign key')) {
+        alert('Não é possível excluir: este funcionário possui registros vinculados (vendas ou atendimentos). Desative-o em vez de excluir.');
+      } else {
+        alert('Erro ao excluir funcionário.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -127,7 +155,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
         </div>
 
         <div className="overflow-x-auto min-h-[200px]">
-          {loading ? (
+          {loading && users.length === 0 ? (
             <div className="flex justify-center items-center p-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
@@ -171,12 +199,32 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
                       />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => handleEdit(user)}
-                        className="text-blue-600 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-lg text-xs font-black transition-all border border-blue-100 uppercase"
-                      >
-                        Editar
-                      </button>
+                      <div className="flex justify-end gap-2 items-center">
+                        {confirmDeleteId === user.id ? (
+                           <div className="flex items-center gap-1 animate-fadeIn">
+                             <button onClick={() => handleDelete(user.id)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-red-700 shadow-sm transition-all">Apagar?</button>
+                             <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-slate-200 transition-all">Sair</button>
+                           </div>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => handleEdit(user)}
+                              className="text-blue-600 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-lg text-xs font-black transition-all border border-blue-100 uppercase"
+                            >
+                              Editar
+                            </button>
+                            <button 
+                              onClick={() => setConfirmDeleteId(user.id)}
+                              className="text-red-500 hover:text-white hover:bg-red-600 px-2 py-1.5 rounded-lg transition-all border border-red-100"
+                              title="Excluir funcionário"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
