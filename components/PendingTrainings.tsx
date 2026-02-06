@@ -4,7 +4,7 @@ import { Client, ViewState, TrainingLog } from '../types';
 
 interface PendingTrainingsProps {
   clients: Client[];
-  logs: TrainingLog[]; // Recebe logs para encontrar o responsável
+  logs: TrainingLog[];
   setView: (view: ViewState) => void;
 }
 
@@ -32,97 +32,83 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn">
-      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Projetos Pendentes</h2>
-          <p className="text-sm text-gray-500">Lista de clientes que aguardam início ou conclusão de treinamento.</p>
-        </div>
+    <div className="animate-fadeIn">
+      <div className="mb-6 px-2">
+        <h2 className="text-xl font-black text-slate-800 tracking-tight">Projetos Pendentes</h2>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+          Aguardando início ou conclusão ({pending.length})
+        </p>
       </div>
       
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Razão Social</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Módulo</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Tipo</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Responsável Técnico</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Início</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Dias Pendentes</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Ação</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {pending.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">Nenhum treinamento pendente no momento.</td>
-              </tr>
-            ) : (
-              pending.map((client) => {
-                const technician = getResponsibleTechnician(client);
-                const hasStarted = logs.some(l => l.clientId === client.id);
-                const daysPending = calculateDaysPending(client.dataInicio);
+      <div className="space-y-4 px-1 pb-10">
+        {pending.length === 0 ? (
+          <div className="bg-white rounded-[2rem] p-10 text-center border border-slate-100 shadow-sm">
+            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            </div>
+            <p className="text-xs text-slate-400 font-bold uppercase">Nenhum treinamento pendente</p>
+          </div>
+        ) : (
+          pending.map((client) => {
+            const technician = getResponsibleTechnician(client);
+            const hasStarted = logs.some(l => l.clientId === client.id);
+            const daysPending = calculateDaysPending(client.dataInicio);
 
-                return (
-                  <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-gray-800">{client.razãoSocial}</p>
-                      <p className="text-xs text-gray-400">{client.protocolo}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {client.modulos.length > 0 ? (
-                          client.modulos.map(m => (
-                            <span key={m} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-black uppercase tracking-tighter">
-                              {m}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-gray-400 italic">Nenhum</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-bold px-2 py-1 bg-orange-100 text-orange-700 rounded-full">
+            return (
+              <div key={client.id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all active:scale-[0.98]">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">{client.protocolo}</p>
+                    <h3 className="text-sm font-black text-slate-800 leading-tight mb-2">{client.razãoSocial}</h3>
+                    
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <span className="text-[8px] bg-orange-50 text-orange-600 px-2 py-1 rounded-lg border border-orange-100 font-black uppercase tracking-widest">
                         {client.tipoTreinamento}
                       </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${!hasStarted ? 'bg-gray-300' : 'bg-green-500 animate-pulse'}`}></div>
-                          <span className={`text-sm font-bold ${!hasStarted ? 'text-gray-700' : 'text-blue-600'}`}>
-                            {technician}
-                          </span>
-                        </div>
-                        {!hasStarted && (
-                          <span className="text-[9px] text-gray-400 italic ml-4">Registrado por</span>
-                        )}
+                      {client.modulos.slice(0, 2).map(m => (
+                        <span key={m} className="text-[8px] bg-slate-50 text-slate-400 px-2 py-1 rounded-lg border border-slate-100 font-black uppercase tracking-widest">
+                          {m}
+                        </span>
+                      ))}
+                      {client.modulos.length > 2 && (
+                        <span className="text-[8px] text-slate-300 font-black p-1">+{client.modulos.length - 2}</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-[14px] font-black ${daysPending > 15 ? 'text-red-500' : daysPending > 7 ? 'text-orange-500' : 'text-blue-400'}`}>
+                      {daysPending}
+                    </span>
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-tighter">dias pend.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-50 pt-4 mt-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-black text-[10px]">
+                      {technician.charAt(0)}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-800 leading-none">{technician.split(' ')[0]}</span>
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className={`w-1.5 h-1.5 rounded-full ${!hasStarted ? 'bg-slate-200' : 'bg-green-500 animate-pulse'}`}></div>
+                        <span className="text-[8px] text-slate-400 font-bold uppercase">{!hasStarted ? 'Aguardando' : 'Em curso'}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 text-center font-medium">
-                      {new Date(client.dataInicio).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`text-sm font-black ${daysPending > 15 ? 'text-red-600' : daysPending > 7 ? 'text-orange-600' : 'text-gray-700'}`}>
-                        {daysPending}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => setView('NEW_TRAINING')}
-                        className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-1.5 rounded-lg font-black text-xs transition-all shadow-sm active:scale-95"
-                      >
-                        Treinar
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setView('NEW_TRAINING')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-blue-100 transition-all active:scale-90"
+                  >
+                    Treinar
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

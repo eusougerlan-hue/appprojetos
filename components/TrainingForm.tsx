@@ -91,40 +91,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     return calc(formData.startTime1, formData.endTime1) + calc(formData.startTime2, formData.endTime2);
   };
 
-  const triggerLogWebhook = async (log: TrainingLog, isUpdate: boolean) => {
-    const settings = await getStoredIntegrations();
-    if (!settings.webhookUrl) return;
-    
-    const eventName = isUpdate ? 'training_log_updated' : 'training_log_created';
-    const client = clients.find(c => c.id === log.clientId);
-    try {
-      const payload = {
-        event: eventName,
-        apiKey: settings.apiKey,
-        usuario_movidesk: user.usuarioMovidesk || '', 
-        client: client ? {
-          id: client.id,
-          razãoSocial: client.razãoSocial,
-          protocolo: client.protocolo,
-          tipoTreinamento: client.tipoTreinamento,
-          modulos: client.modulos,
-          duracaoContratada: client.duracaoHoras,
-          status: client.status
-        } : null,
-        log: log, 
-        timestamp: new Date().toISOString()
-      };
-      
-      await fetch(settings.webhookUrl, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload) 
-      });
-    } catch (error) { 
-      console.error('Falha ao disparar webhook:', error); 
-    }
-  };
-
   const handleEdit = (log: TrainingLog) => {
     setEditingLogId(log.id);
     setFormData({
@@ -143,19 +109,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       ownVehicleKmValue: log.ownVehicleKmValue || 0
     });
     setViewMode('form');
-  };
-
-  const handleDeleteLog = async (id: string) => {
-    setDeletingId(id);
-    try {
-      await deleteLog(id);
-      setConfirmDeleteId(null);
-      onComplete();
-    } catch (err) {
-      alert('Erro ao excluir o registro.');
-    } finally {
-      setDeletingId(null);
-    }
   };
 
   const resetForm = () => {
@@ -177,17 +130,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     });
   };
 
-  const filteredLogs = useMemo(() => {
-    let result = [...logs];
-    if (searchTerm.trim()) {
-      result = result.filter(log => {
-        const client = clients.find(c => c.id === log.clientId);
-        return client?.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase());
-      });
-    }
-    return result;
-  }, [logs, clients, searchTerm]);
-
   const toggleContactSelection = (contact: Contact) => {
     setFormData(prev => ({
       ...prev,
@@ -200,7 +142,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.clientId) return alert('Selecione um cliente');
-    if (!formData.startTime1 || !formData.endTime1) return alert('Preencha pelo menos o primeiro turno de horários');
+    if (!formData.startTime1 || !formData.endTime1) return alert('Preencha os horários do 1º turno');
 
     setLoading(true);
     try {
@@ -230,17 +172,15 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
       if (editingLogId) {
         await updateLog(logData);
-        await triggerLogWebhook(logData, true);
       } else {
         await saveLog(logData);
-        await triggerLogWebhook(logData, false);
       }
       
       onComplete();
       setViewMode('list');
       resetForm();
     } catch (err) {
-      alert('Erro ao salvar no banco.');
+      alert('Erro ao salvar registro.');
     } finally {
       setLoading(false);
     }
@@ -248,87 +188,47 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 animate-fadeIn overflow-hidden">
-        <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center bg-white sticky top-0 z-10 gap-4">
-          <div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">Atendimentos</h2>
-            <p className="text-sm text-slate-500 font-medium">Histórico de treinamentos realizados.</p>
-          </div>
-          <div className="flex flex-1 items-center justify-end gap-4 w-full md:w-auto">
-            <input
-              type="text"
-              className="block w-full max-w-xs pl-4 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              placeholder="Buscar cliente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 animate-fadeIn overflow-hidden">
+        <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Atendimentos</h2>
             <button 
               onClick={() => { resetForm(); setViewMode('form'); }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-blue-100 flex items-center gap-2 uppercase tracking-wider transition-all active:scale-95"
+              className="bg-blue-600 text-white p-2 rounded-xl shadow-lg active:scale-95 transition-all"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-              Novo Atendimento
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
             </button>
           </div>
+          <input
+            type="text"
+            className="w-full pl-4 pr-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-[10px] font-bold outline-none"
+            placeholder="Buscar por cliente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
-          {loading ? (
-             <div className="flex justify-center items-center p-20">
-               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-             </div>
+        <div className="max-h-[500px] overflow-y-auto">
+          {logs.length === 0 ? (
+            <p className="p-10 text-center text-slate-400 text-[10px] font-bold uppercase">Sem registros</p>
           ) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data / Cliente</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Horas</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Logística</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-16 text-center text-slate-400 font-bold">Nenhum treinamento registrado.</td>
-                  </tr>
-                ) : (
-                  filteredLogs.slice(0, 50).map((log) => {
-                    const client = clients.find(c => c.id === log.clientId);
-                    return (
-                      <tr key={log.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <p className="font-black text-slate-700 text-sm leading-tight">{new Date(log.date).toLocaleDateString('pt-BR')}</p>
-                          <p className="text-xs text-blue-600 font-black uppercase tracking-tighter mt-0.5">{client?.razãoSocial || 'Cliente Excluído'}</p>
-                        </td>
-                        <td className="px-6 py-4 text-center text-sm font-black text-slate-800">{log.horasCalculadas.toFixed(1)}h</td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full border bg-blue-50 text-blue-600">{log.transportType}</span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-1 items-center">
-                            {deletingId === log.id ? (
-                               <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
-                            ) : confirmDeleteId === log.id ? (
-                               <div className="flex items-center gap-1 animate-fadeIn">
-                                  <button onClick={() => handleDeleteLog(log.id)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-red-700 shadow-sm transition-all">Apagar?</button>
-                                  <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-slate-200 transition-all">Sair</button>
-                               </div>
-                            ) : (
-                               <React.Fragment>
-                                <button onClick={() => handleEdit(log)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                                {/* Fix: Added missing double quote after className="w-5 h-5" */}
-                                <button onClick={() => setConfirmDeleteId(log.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                               </React.Fragment>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+            <div className="divide-y divide-slate-50">
+              {logs.filter(l => clients.find(c => c.id === l.clientId)?.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase())).map(log => {
+                const client = clients.find(c => c.id === log.clientId);
+                return (
+                  <div key={log.id} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                    <div>
+                      <p className="text-[10px] font-black text-blue-600 uppercase">{client?.razãoSocial}</p>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">{new Date(log.date).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-black text-slate-800">{log.horasCalculadas.toFixed(1)}h</span>
+                       <button onClick={() => handleEdit(log)} className="text-blue-500 p-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -336,173 +236,87 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   }
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp overflow-hidden max-w-5xl mx-auto">
-      <div className="p-10 flex flex-col md:flex-row justify-between items-start gap-4">
+    <div className="bg-white rounded-3xl animate-slideUp overflow-hidden">
+      <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Novo Atendimento</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">OS DADOS SERÃO SALVOS PERMANENTEMENTE NO SUPABASE.</p>
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Novo Atendimento</h2>
+          <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Gestão de Horas do Técnico</p>
         </div>
-        
-        <div className="flex items-center gap-4">
-          {user.role === UserRole.MANAGER && (
-            <button 
-              type="button"
-              onClick={() => setShowAllProjects(!showAllProjects)}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
-                showAllProjects ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
-              }`}
-            >
-              {showAllProjects ? 'Exibindo todos os projetos' : 'Ver todos os projetos'}
-            </button>
-          )}
-          <span className="px-6 py-2 bg-blue-50 text-blue-700 rounded-2xl text-[10px] font-black border border-blue-100 uppercase tracking-widest">{user.name}</span>
-        </div>
+        <button onClick={() => setViewMode('list')} className="text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
       </div>
       
-      <form onSubmit={handleSubmit} className="px-10 pb-10 space-y-10">
-        <div className="border-2 border-blue-400 rounded-[2rem] p-10 space-y-10 relative">
-          <div className="space-y-3">
-            <div className="flex justify-between items-end">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CLIENTE ATENDIDO</label>
-              {pendingClients.length === 0 && (
-                <span className="text-[9px] font-bold text-red-500 uppercase italic">Nenhum protocolo seu encontrado</span>
-              )}
-            </div>
+      <form onSubmit={handleSubmit} className="p-5 space-y-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Cliente Atendido</label>
             <select
-              className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 bg-white transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center]" 
-              style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2.5\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundSize: '1.2rem'}}
+              className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 outline-none font-bold text-slate-700 bg-white text-xs appearance-none"
               value={formData.clientId}
               onChange={(e) => setFormData({...formData, clientId: e.target.value, receivedBy: []})}
               required
               disabled={!!editingLogId || loading}
             >
-              <option value="">Selecione um cliente...</option>
+              <option value="">Selecione...</option>
               {pendingClients.map(c => <option key={c.id} value={c.id}>{c.razãoSocial}</option>)}
             </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">DATA DO ATENDIMENTO</label>
-              <input type="date" className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-200 focus:border-blue-500 outline-none font-black text-slate-800 bg-white transition-all" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required disabled={loading} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Data</label>
+              <input type="date" className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 font-bold text-slate-800 text-xs" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
             </div>
-
-            <div className="space-y-3">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NÚMERO DO PROTOCOLO</label>
-              <div className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-slate-100 font-black bg-slate-50 text-slate-400 min-h-[64px] flex items-center shadow-inner">
-                {selectedClient ? selectedClient.protocolo : 'Selecione um cliente'}
+            <div>
+              <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Protocolo</label>
+              <div className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-50 font-black bg-slate-50 text-slate-400 text-[9px] truncate h-[46px] flex items-center">
+                {selectedClient?.protocolo || 'Nenhum'}
               </div>
             </div>
           </div>
 
-          <div className="p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 space-y-8">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              </div>
-              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">HORÁRIOS DE ATENDIMENTO</h4>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              <div className="space-y-5">
-                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-100/50 px-4 py-1.5 rounded-full border border-blue-100">1º TURNO (OBRIGATÓRIO)</span>
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-300 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.startTime1} onChange={(e) => setFormData({...formData, startTime1: e.target.value})} required disabled={loading} />
-                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-300 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.endTime1} onChange={(e) => setFormData({...formData, endTime1: e.target.value})} required disabled={loading} />
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-1.5 rounded-full border border-slate-100">2º TURNO (OPCIONAL)</span>
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-200 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.startTime2} onChange={(e) => setFormData({...formData, startTime2: e.target.value})} disabled={loading} />
-                  <input type="time" className="w-full px-6 py-4 rounded-2xl border-2 border-white focus:border-blue-200 shadow-sm font-black text-slate-700 outline-none transition-all" value={formData.endTime2} onChange={(e) => setFormData({...formData, endTime2: e.target.value})} disabled={loading} />
-                </div>
-              </div>
+          <div className="bg-blue-50/50 p-4 rounded-2xl space-y-4 border border-blue-100">
+            <h4 className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Horários</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <input type="time" className="w-full px-3 py-3 rounded-xl border-2 border-white font-black text-slate-700 text-xs" value={formData.startTime1} onChange={(e) => setFormData({...formData, startTime1: e.target.value})} required />
+              <input type="time" className="w-full px-3 py-3 rounded-xl border-2 border-white font-black text-slate-700 text-xs" value={formData.endTime1} onChange={(e) => setFormData({...formData, endTime1: e.target.value})} required />
             </div>
           </div>
 
-          <div className="p-8 bg-indigo-50/20 rounded-[2rem] border-2 border-indigo-100/50 space-y-8">
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                </div>
-                <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">LOGÍSTICA DE DESLOCAMENTO</h4>
-            </div>
+          <div>
+            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Logística</label>
+            <select className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 text-xs" value={formData.transportType} onChange={(e) => setFormData({...formData, transportType: e.target.value as TransportType})}>
+              <option value={TransportType.ONLINE}>Online</option>
+              <option value={TransportType.UBER}>Uber</option>
+              <option value={TransportType.OWN_VEHICLE}>Carro Próprio</option>
+            </select>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tipo de Deslocamento</label>
-                  <select className="w-full px-8 py-5 rounded-[1.5rem] border-2 border-indigo-100 focus:border-indigo-500 outline-none font-bold text-indigo-700 bg-white transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center]" 
-                    style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2.5\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundSize: '1.2rem'}}
-                    value={formData.transportType} onChange={(e) => setFormData({...formData, transportType: e.target.value as TransportType})} disabled={loading}>
-                      <option value={TransportType.ONLINE}>🌐 Atendimento Online (Sem custos)</option>
-                      <option value={TransportType.UBER}>🚖 Uber / Táxi</option>
-                      <option value={TransportType.OWN_VEHICLE}>🚗 Veículo Próprio</option>
-                  </select>
-                </div>
-
-                {formData.transportType === TransportType.UBER && (
-                  <div className="grid grid-cols-2 gap-4 animate-fadeIn">
-                    <div className="space-y-3">
-                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor Ida (R$)</label>
-                        <input type="number" step="0.01" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.uberIda} onChange={e => setFormData({...formData, uberIda: Number(e.target.value)})} disabled={loading} />
-                    </div>
-                    <div className="space-y-3">
-                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor Volta (R$)</label>
-                        <input type="number" step="0.01" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.uberVolta} onChange={e => setFormData({...formData, uberVolta: Number(e.target.value)})} disabled={loading} />
-                    </div>
-                  </div>
-                )}
-
-                {formData.transportType === TransportType.OWN_VEHICLE && (
-                  <div className="grid grid-cols-2 gap-4 animate-fadeIn">
-                    <div className="space-y-3">
-                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">KM Rodado</label>
-                        <input type="number" step="0.1" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.ownVehicleKm} onChange={e => setFormData({...formData, ownVehicleKm: Number(e.target.value)})} disabled={loading} />
-                    </div>
-                    <div className="space-y-3">
-                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor p/ KM (R$)</label>
-                        <input type="number" step="0.01" className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 font-black text-indigo-800 bg-white shadow-inner" value={formData.ownVehicleKmValue} onChange={e => setFormData({...formData, ownVehicleKmValue: Number(e.target.value)})} disabled={loading} />
-                    </div>
-                  </div>
-                )}
+          <div>
+            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Participantes</label>
+            <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-h-[60px]">
+              {availableContacts.map(contact => (
+                <button 
+                  key={contact.name} 
+                  type="button" 
+                  onClick={() => toggleContactSelection(contact)} 
+                  className={`px-3 py-1.5 rounded-lg text-[8px] font-black border transition-all ${formData.receivedBy.some(c => c.name === contact.name) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                >
+                  {contact.name}
+                </button>
+              ))}
+              {availableContacts.length === 0 && <p className="text-[8px] text-slate-300 italic">Sem contatos cadastrados</p>}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
-            <div className="space-y-5">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">PARTICIPANTES</label>
-                <div className="flex flex-wrap gap-2 p-8 bg-slate-50/50 rounded-[2rem] border border-slate-200 min-h-[120px] shadow-inner">
-                  {availableContacts.length === 0 ? <p className="text-[10px] text-slate-400 font-bold italic p-1">Nenhum contato cadastrado na base.</p> : 
-                    availableContacts.map(contact => {
-                      const isSelected = formData.receivedBy.some(c => c.name === contact.name);
-                      return (
-                        <button key={contact.name} type="button" onClick={() => toggleContactSelection(contact)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black border-2 transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400'}`}>
-                          {contact.name}
-                        </button>
-                      );
-                  })}
-                </div>
-            </div>
-
-            <div className="space-y-5">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">INFORMAÇÕES ADICIONAIS / OBSERVAÇÃO</label>
-                <textarea className="w-full px-8 py-8 rounded-[2rem] border-2 border-slate-200 focus:border-blue-500 h-44 outline-none text-sm font-bold text-slate-700 bg-white resize-none shadow-inner transition-all" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="Descreva aqui os detalhes do que foi treinado..." disabled={loading}></textarea>
-            </div>
+          <div>
+            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Observações</label>
+            <textarea className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 h-24 text-xs font-bold text-slate-700 outline-none resize-none" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="O que foi treinado hoje?"></textarea>
           </div>
         </div>
 
-        <div className="flex justify-end items-center gap-10 pt-4 px-4">
-          <button type="button" onClick={() => { resetForm(); setViewMode('list'); }} className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all" disabled={loading}>CANCELAR</button>
-          <button type="submit" disabled={loading} className="px-24 py-6 bg-blue-600 text-white font-black rounded-[1.5rem] shadow-2xl shadow-blue-200 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50 flex items-center gap-4 uppercase tracking-[0.2em] text-[11px]">
-            {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-            ) : (
-              editingLogId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR ATENDIMENTO'
-            )}
-          </button>
-        </div>
+        <button type="submit" disabled={loading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest text-[10px] active:scale-95 transition-all">
+          {loading ? 'Salvando...' : 'Confirmar Atendimento'}
+        </button>
       </form>
     </div>
   );

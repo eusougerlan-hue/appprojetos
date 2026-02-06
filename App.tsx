@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserRole, ViewState, Client, TrainingLog, BrandingConfig } from './types';
 import { getStoredClients, getStoredLogs, getStoredBranding, normalizeString } from './storage';
-import { isSupabaseConfigured, getSupabase } from './supabase';
+import { isSupabaseConfigured } from './supabase';
 import LoginForm from './components/LoginForm';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -36,119 +36,40 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(() => {
     const saved = localStorage.getItem(SESSION_KEY);
     if (!saved) return 'LOGIN';
-    const params = new URLSearchParams(window.location.search);
-    const requestedView = params.get('view') as ViewState;
-    const validViews: ViewState[] = ['NEW_TRAINING', 'PENDING_LIST', 'CLIENT_REG', 'DASHBOARD'];
-    if (requestedView && validViews.includes(requestedView)) return requestedView;
     return 'DASHBOARD';
   });
 
   const [clients, setClients] = useState<Client[]>([]);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
-  const [branding, setBranding] = useState<BrandingConfig>(() => {
-    const cached = localStorage.getItem('TM_BRANDING_DATA');
-    if (cached) {
-      try { return JSON.parse(cached); } catch (e) {}
-    }
-    return {
-      appName: 'TrainMaster',
-      appSubtitle: 'SISTEMA PRO',
-      logoUrl: ''
-    };
+  const [branding, setBranding] = useState<BrandingConfig>({
+    appName: 'TrainMaster',
+    appSubtitle: 'SISTEMA PRO',
+    logoUrl: ''
   });
   
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
-  const [loading, setLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
 
-  useEffect(() => {
-    const { appName, appSubtitle, logoUrl } = branding;
-    const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png';
-    const iconUrl = logoUrl || defaultIcon;
-    const fullDescription = `${appName} - ${appSubtitle}`;
-
-    document.title = `${appName} | ${appSubtitle}`;
-    let metaDesc = document.querySelector('meta[name="description"]');
-    if (!metaDesc) {
-      metaDesc = document.createElement('meta');
-      metaDesc.setAttribute('name', 'description');
-      document.head.appendChild(metaDesc);
-    }
-    metaDesc.setAttribute('content', fullDescription);
-
-    const favicon = document.getElementById('dynamic-favicon') as HTMLLinkElement;
-    const appleIcon = document.getElementById('dynamic-apple-icon') as HTMLLinkElement;
-    if (favicon) favicon.href = iconUrl;
-    if (appleIcon) appleIcon.href = iconUrl;
-
-    const manifest = {
-      name: appName,
-      short_name: appName,
-      description: fullDescription,
-      start_url: "./",
-      display: "standalone",
-      background_color: "#f8fafc",
-      theme_color: "#2563eb",
-      orientation: "portrait",
-      icons: [
-        { src: iconUrl, sizes: "512x512", type: "image/png", purpose: "any maskable" },
-        { src: iconUrl, sizes: "192x192", type: "image/png" }
-      ]
-    };
-
-    const stringManifest = JSON.stringify(manifest);
-    const blob = new Blob([stringManifest], { type: 'application/json' });
-    const manifestUrl = URL.createObjectURL(blob);
-    const manifestTag = document.getElementById('dynamic-manifest') as HTMLLinkElement;
-    if (manifestTag) manifestTag.href = manifestUrl;
-    return () => URL.revokeObjectURL(manifestUrl);
-  }, [branding]);
-
   const refreshData = useCallback(async () => {
     if (!isConfigured) return;
-    setLoading(true);
     try {
       const [storedClients, storedLogs, storedBranding] = await Promise.all([
         currentUser ? getStoredClients() : Promise.resolve([]),
         currentUser ? getStoredLogs() : Promise.resolve([]),
         getStoredBranding()
       ]);
-      setClients(storedClients);
-      setLogs(storedLogs);
-      setBranding(storedBranding);
+      setClients(storedClients || []);
+      setLogs(storedLogs || []);
+      setBranding(brandData => ({ ...brandData, ...storedBranding }));
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
-    } finally {
-      setLoading(false);
     }
   }, [isConfigured, currentUser]);
 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
-
-  useEffect(() => {
-    if (!isConfigured || !currentUser) return;
-    const supabase = getSupabase();
-    const channel = supabase
-      .channel('public_clients_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, (payload) => {
-          const newClient = payload.new;
-          const techInDb = normalizeString(newClient.responsavel_tecnico || '');
-          const userNow = normalizeString(currentUser.name || '');
-          if (techInDb === userNow) {
-            setNotification({ message: newClient.razao_social, subMessage: `Protocolo ${newClient.protocolo} atribuído a você.` });
-            if ("Notification" in window && Notification.permission === "granted") {
-              new Notification(`Nova Venda: ${newClient.razao_social}`, { body: `Protocolo ${newClient.protocolo} atribuído a você agora.` });
-            }
-            try { new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {}); } catch (e) {}
-            refreshData();
-          }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [isConfigured, currentUser, refreshData]);
 
   const filteredData = useMemo(() => {
     if (!currentUser) return { clients: [], logs: [] };
@@ -176,55 +97,35 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
-  if (!isConfigured) return <SetupView />;
-  if (view === 'LOGIN') return <LoginForm onLogin={handleLogin} branding={branding} />;
+  const renderContent = () => {
+    if (!isConfigured) return <SetupView />;
+    if (view === 'LOGIN') return <LoginForm onLogin={handleLogin} branding={branding} />;
 
-  return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
-      {notification && (
-        <NotificationToast 
-          message={notification.message}
-          subMessage={notification.subMessage}
-          onClose={() => setNotification(null)}
-        />
-      )}
-
-      <Sidebar 
-        user={currentUser} 
-        onLogout={handleLogout} 
-        setView={setView} 
-        currentView={view} 
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        branding={branding}
-      />
-      
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-72 transition-all duration-300">
-        <header className="bg-white border-b border-gray-100 px-4 md:px-8 py-3 flex justify-between items-center z-[40] shadow-sm flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(true)} 
-              className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
-          </div>
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <header className="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center z-40 shadow-sm flex-shrink-0">
+          <button 
+            onClick={() => setIsSidebarOpen(true)} 
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
           
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end">
-              <span className="text-sm font-black text-gray-800 leading-none">{currentUser?.name}</span>
-              <span className="text-[9px] text-blue-600 font-black uppercase tracking-widest mt-1.5">
-                {currentUser?.role === UserRole.MANAGER ? 'Master Admin' : 'Tech Analyst'}
+              <span className="text-[10px] font-black text-gray-800 leading-none">{currentUser?.name.split(' ')[0]}</span>
+              <span className="text-[8px] text-blue-600 font-black uppercase tracking-widest mt-1">
+                {currentUser?.role === UserRole.MANAGER ? 'Admin' : 'Analista'}
               </span>
             </div>
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black border-2 border-white shadow-md text-sm uppercase">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black border border-white shadow-sm text-xs uppercase">
               {currentUser?.name.charAt(0)}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-gray-50/50 p-4 md:p-6">
-          <div className="max-w-6xl mx-auto pb-20">
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50 p-4 pb-20">
+          <div className="animate-fadeIn max-w-full">
             {view === 'DASHBOARD' && <Dashboard user={currentUser!} clients={filteredData.clients} logs={filteredData.logs} setView={setView} />}
             {view === 'CLIENT_REG' && <CustomerManagement user={currentUser!} onComplete={() => { refreshData(); setView('DASHBOARD'); }} />}
             {view === 'TRAINING_PURCHASE' && <TrainingPurchase user={currentUser!} onComplete={() => refreshData()} />}
@@ -240,6 +141,36 @@ const App: React.FC = () => {
             {view === 'INTEGRATIONS' && <Integrations onBrandingChange={refreshData} />}
           </div>
         </main>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full h-full min-h-screen bg-slate-900 flex justify-center items-center overflow-hidden">
+      {/* Container Principal: Proporção 9:16 fixa no Desktop, Full no Mobile */}
+      <div className="w-full h-full md:w-[420px] md:h-[746px] bg-white flex flex-col relative md:shadow-[0_0_80px_rgba(0,0,0,0.6)] md:rounded-[3rem] overflow-hidden transition-all">
+        
+        {notification && (
+          <NotificationToast 
+            message={notification.message}
+            subMessage={notification.subMessage}
+            onClose={() => setNotification(null)}
+          />
+        )}
+
+        {view !== 'LOGIN' && isConfigured && (
+          <Sidebar 
+            user={currentUser} 
+            onLogout={handleLogout} 
+            setView={setView} 
+            currentView={view} 
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
+            branding={branding}
+          />
+        )}
+        
+        {renderContent()}
       </div>
     </div>
   );

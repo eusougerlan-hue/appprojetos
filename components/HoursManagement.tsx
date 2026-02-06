@@ -23,7 +23,6 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   
-  // Estados para o fluxo de modais
   const [activeClient, setActiveClient] = useState<Client | null>(null);
   const [modalAction, setModalAction] = useState<ModalAction>('idle');
   const [finalizeMessage, setFinalizeMessage] = useState('');
@@ -79,14 +78,8 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
       }
     });
     const participantes = Array.from(participantsMap.values());
-    
-    // Busca o cliente base para obter contatos e refMovidesk
     const customer = customers.find(c => c.id === client.customerId);
-    
-    // Busca os dados detalhados do Solicitante (Usuário Chave)
     const solicitanteDados = customer?.contacts?.find(c => c.name === client.solicitante);
-    
-    // Busca o usuarioMovidesk do técnico responsável
     const technicianUser = allUsers.find(u => u.name === technicianName);
 
     try {
@@ -98,10 +91,10 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
         ref_movidesk: customer?.refMovidesk || '', 
         usuario_movidesk: technicianUser?.usuarioMovidesk || '',
         tipo_treinamento: client.tipoTreinamento,
-        modulos: client.modulos, // Enviando os módulos contratados
+        modulos: client.modulos,
         solicitante_nome: client.solicitante || '',
-        solicitante_telefone: solicitanteDados?.phone || '', // Telefone do solicitante
-        solicitante_email: solicitanteDados?.email || '', // E-mail do solicitante
+        solicitante_telefone: solicitanteDados?.phone || '',
+        solicitante_email: solicitanteDados?.email || '',
         horas_contratadas: client.duracaoHoras,
         horas_utilizadas: Number(usedHours.toFixed(1)),
         saldo_restante: Number(balance.toFixed(1)),
@@ -142,15 +135,11 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
 
   const executeFinalize = async () => {
     if (!activeClient) return;
-
     const used = getUsedHours(activeClient.id);
     const balance = activeClient.duracaoHoras - used;
     const technician = getResponsibleTechnician(activeClient);
-    
     const dataAtual = new Date().toISOString().split('T')[0];
-
     await triggerFinalizeWebhook(activeClient, used, balance, technician, finalizeMessage);
-
     const success = await updateClientStatus(activeClient.id, 'completed', dataAtual, Number(balance.toFixed(1)));
     if (success) {
       refreshData();
@@ -182,19 +171,16 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
 
   const filteredClients = useMemo(() => {
     let list = [...clients];
-    
     if (selectedTechs.length > 0) {
       list = list.filter(client => {
         const currentTech = getResponsibleTechnician(client);
         return selectedTechs.includes(currentTech);
       });
     }
-
     if (statusFilter !== 'ALL') {
       const targetStatus = statusFilter === 'PENDING' ? 'pending' : 'completed';
       list = list.filter(c => c.status === targetStatus);
     }
-
     return list.sort((a, b) => {
       if (a.status === b.status) return a.razãoSocial.localeCompare(b.razãoSocial);
       return a.status === 'pending' ? -1 : 1;
@@ -202,93 +188,71 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
   }, [clients, selectedTechs, statusFilter, logs]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 animate-fadeIn min-h-[400px]">
-      {/* Sistema de Modais Customizados */}
+    <div className="animate-fadeIn">
+      {/* Modais Customizados */}
       {modalAction !== 'idle' && activeClient && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-slideUp border border-gray-100">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden animate-slideUp border border-slate-100">
             <div className="p-8">
               {modalAction === 'finalize_confirm' && (
                 <div className="text-center">
-                  <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-3xl flex items-center justify-center mb-6 mx-auto ring-4 ring-orange-50/50">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
+                  <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-3xl flex items-center justify-center mb-6 mx-auto">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-800 mb-3 tracking-tight">Tem certeza?</h3>
-                  <p className="text-gray-500 font-medium mb-8 leading-relaxed">
-                    Você deseja marcar como <strong>Finalizado</strong> o treinamento de <br/>
-                    <strong className="text-blue-600">{activeClient.razãoSocial}</strong>?
+                  <h3 className="text-xl font-black text-slate-800 mb-3 tracking-tight">Finalizar Projeto?</h3>
+                  <p className="text-xs text-slate-500 font-medium mb-8 leading-relaxed px-4">
+                    Confirmar encerramento de <strong className="text-blue-600">{activeClient.razãoSocial}</strong>?
                   </p>
                   <div className="flex gap-3">
-                    <button onClick={closeModal} className="flex-1 px-6 py-4 bg-gray-100 hover:bg-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest rounded-2xl transition-all">Cancelar</button>
-                    <button onClick={() => setModalAction('finalize_message')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-100 transition-all">Continuar</button>
+                    <button onClick={closeModal} className="flex-1 py-4 bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-2xl">Voltar</button>
+                    <button onClick={() => setModalAction('finalize_message')} className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100">Próximo</button>
                   </div>
                 </div>
               )}
 
               {modalAction === 'finalize_message' && (
                 <div className="animate-fadeIn">
-                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 mx-auto">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-black text-gray-800 text-center mb-2 tracking-tight">Observações Finais</h3>
+                  <h3 className="text-lg font-black text-slate-800 text-center mb-4 tracking-tight">Nota de Encerramento</h3>
                   <textarea
                     autoFocus
-                    className="w-full px-5 py-4 rounded-2xl border-2 border-gray-100 focus:border-blue-500 outline-none font-medium text-sm bg-gray-50/50 min-h-[140px] transition-all resize-none mb-6"
-                    placeholder="Como foi o encerramento?"
+                    className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none font-bold text-xs bg-slate-50/50 min-h-[120px] transition-all resize-none mb-6"
+                    placeholder="Descreva brevemente como foi o projeto..."
                     value={finalizeMessage}
                     onChange={(e) => setFinalizeMessage(e.target.value)}
                   />
                   <div className="flex gap-3">
-                    <button onClick={() => setModalAction('finalize_confirm')} className="px-6 py-4 text-gray-400 hover:text-gray-600 font-black text-xs uppercase tracking-widest transition-all">Voltar</button>
-                    <button onClick={executeFinalize} className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-green-100 transition-all">Concluir Agora</button>
+                    <button onClick={() => setModalAction('finalize_confirm')} className="px-4 py-4 text-slate-400 font-black text-[9px] uppercase tracking-widest">Voltar</button>
+                    <button onClick={executeFinalize} className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-green-100">Finalizar</button>
                   </div>
                 </div>
               )}
 
               {modalAction === 'revert_confirm' && (
                 <div className="text-center animate-fadeIn">
-                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mb-6 mx-auto ring-4 ring-red-50/50">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mb-6 mx-auto">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-800 mb-3 tracking-tight">Reverter Status?</h3>
-                  <p className="text-gray-500 font-medium mb-8 leading-relaxed">
-                    Deseja retornar o cliente <strong className="text-red-600">{activeClient.razãoSocial}</strong> para o status <strong>Pendente</strong>?
+                  <h3 className="text-xl font-black text-slate-800 mb-3 tracking-tight">Reverter Status?</h3>
+                  <p className="text-xs text-slate-500 font-medium mb-8 leading-relaxed px-4">
+                    O projeto voltará para o status <strong>Pendente</strong>.
                   </p>
                   <div className="flex gap-3">
-                    <button onClick={closeModal} className="flex-1 px-6 py-4 bg-gray-100 hover:bg-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest rounded-2xl transition-all">Cancelar</button>
-                    <button onClick={executeRevert} className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-red-100 transition-all">Sim, Reverter</button>
+                    <button onClick={closeModal} className="flex-1 py-4 bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-2xl">Cancelar</button>
+                    <button onClick={executeRevert} className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-red-100">Sim, Reverter</button>
                   </div>
                 </div>
               )}
 
               {modalAction === 'revert_blocked' && (
                 <div className="text-center animate-fadeIn">
-                  <div className="w-20 h-20 bg-gray-100 text-gray-400 rounded-3xl flex items-center justify-center mb-6 mx-auto ring-4 ring-gray-50">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                  <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                   </div>
-                  <h3 className="text-xl font-black text-gray-800 mb-3 tracking-tight">Ação Bloqueada</h3>
-                  <div className="bg-red-50 p-4 rounded-2xl mb-8 border border-red-100">
-                    <p className="text-red-800 text-sm font-bold leading-relaxed">
-                      A comissão deste treinamento já foi paga para <strong className="uppercase">{activeClient.responsavelTecnico}</strong>.
-                    </p>
-                    <p className="text-red-600 text-xs mt-2 font-medium">
-                      Para reverter o status deste treinamento, por favor acione o <strong>gestor financeiro</strong> para estornar o pagamento primeiro.
-                    </p>
-                  </div>
-                  <button 
-                    onClick={closeModal} 
-                    className="w-full px-6 py-4 bg-gray-800 hover:bg-black text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg"
-                  >
-                    Entendido
-                  </button>
+                  <h3 className="text-lg font-black text-slate-800 mb-3 tracking-tight">Ação Bloqueada</h3>
+                  <p className="text-[10px] text-red-500 font-bold leading-relaxed mb-8 px-4 uppercase tracking-widest">
+                    A comissão deste projeto já foi paga. Procure o setor financeiro para estorno.
+                  </p>
+                  <button onClick={closeModal} className="w-full py-4 bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl">Entendido</button>
                 </div>
               )}
             </div>
@@ -296,57 +260,42 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
         </div>
       )}
 
-      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Gestão de Horas de Treinamento</h2>
-          <p className="text-sm text-gray-500">Acompanhe o saldo de horas e finalize implantações.</p>
+      {/* Cabeçalho e Filtros */}
+      <div className="mb-6 space-y-4">
+        <div className="px-2">
+          <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none">Gestão de Horas</h2>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Acompanhamento e Finalização</p>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
-            <button
-              onClick={() => setStatusFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === 'ALL' ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setStatusFilter('PENDING')}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === 'PENDING' ? 'bg-orange-50 text-white shadow-md shadow-orange-100' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Pendente
-            </button>
-            <button
-              onClick={() => setStatusFilter('COMPLETED')}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === 'COMPLETED' ? 'bg-green-600 text-white shadow-md shadow-green-100' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Finalizado
-            </button>
+        <div className="flex flex-col gap-3 px-2">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+            <button onClick={() => setStatusFilter('ALL')} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${statusFilter === 'ALL' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Todos</button>
+            <button onClick={() => setStatusFilter('PENDING')} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${statusFilter === 'PENDING' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-400'}`}>Em Curso</button>
+            <button onClick={() => setStatusFilter('COMPLETED')} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${statusFilter === 'COMPLETED' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-400'}`}>Finalizados</button>
           </div>
 
           {isManager && (
-            <div className="relative w-full md:w-auto">
+            <div className="relative">
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-blue-200 rounded-xl shadow-sm hover:border-blue-400 transition-all text-sm font-bold text-gray-700 min-w-[220px] justify-between w-full md:w-auto"
+                className="w-full flex items-center justify-between px-5 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm text-[11px] font-black text-slate-700 uppercase tracking-widest transition-all active:scale-[0.98]"
               >
-                <span className="truncate max-w-[160px]">
+                <span className="truncate">
                   {selectedTechs.length === 0 ? 'Todos os Técnicos' : selectedTechs.length === 1 ? selectedTechs[0] : `${selectedTechs.length} Selecionados`}
                 </span>
                 <svg className={`w-4 h-4 text-blue-500 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
               </button>
+              
               {isFilterOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)}></div>
-                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 p-2 animate-slideIn">
-                    <div className="max-h-60 overflow-y-auto pr-1">
-                      {allTechnicians.map(tech => (
-                        <label key={tech} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${selectedTechs.includes(tech) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
-                          <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" checked={selectedTechs.includes(tech)} onChange={() => toggleTechFilter(tech)} />
-                          <span className={`text-sm font-bold ${selectedTechs.includes(tech) ? 'text-blue-700' : 'text-gray-600'}`}>{tech}</span>
-                        </label>
-                      ))}
-                    </div>
+                  <div className="fixed inset-0 z-[60]" onClick={() => setIsFilterOpen(false)}></div>
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-[2rem] shadow-2xl z-[70] p-4 animate-slideDown max-h-64 overflow-y-auto custom-scrollbar">
+                    {allTechnicians.map(tech => (
+                      <label key={tech} className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors ${selectedTechs.includes(tech) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-slate-300" checked={selectedTechs.includes(tech)} onChange={() => toggleTechFilter(tech)} />
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${selectedTechs.includes(tech) ? 'text-blue-700' : 'text-slate-600'}`}>{tech}</span>
+                      </label>
+                    ))}
                   </div>
                 </>
               )}
@@ -354,87 +303,92 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
           )}
         </div>
       </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Protocolo</th>
-              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
-              <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Horas Contratadas</th>
-              <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Horas Utilizadas</th>
-              <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Saldo de Horas</th>
-              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Progresso</th>
-              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Técnico</th>
-              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ação</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredClients.map((client) => {
-              const used = getUsedHours(client.id);
-              const balance = client.duracaoHoras - used;
-              const percent = Math.min(100, (used / client.duracaoHoras) * 100);
-              const isCompleted = client.status === 'completed';
-              const technician = getResponsibleTechnician(client);
 
-              return (
-                <tr key={client.id} className={`transition-all ${isCompleted ? 'bg-gray-50/70' : 'hover:bg-gray-50'}`}>
-                  <td className="px-6 py-4 font-medium text-gray-500 text-xs whitespace-nowrap">{client.protocolo}</td>
-                  <td className="px-6 py-4 font-bold text-gray-800 text-sm">{client.razãoSocial}</td>
-                  <td className="px-4 py-4 text-center">
-                    <span className="text-xs font-bold text-gray-500">{client.duracaoHoras.toFixed(1)}h</span>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <span className={`text-xs font-black ${isCompleted ? 'text-gray-300' : 'text-blue-600'}`}>{used.toFixed(1)}h</span>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <span className={`text-xs font-black px-2 py-1 rounded-lg ${
-                      balance <= 0 ? 'bg-green-50 text-green-600' : 
-                      balance < client.duracaoHoras * 0.2 ? 'bg-red-50 text-red-600' : 
-                      'bg-orange-50 text-orange-600'
-                    }`}>
-                      {balance.toFixed(1)}h
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col items-center">
-                      <span className={`text-[10px] font-black mb-1 ${isCompleted ? 'text-gray-300' : 'text-blue-600'}`}>
-                        {percent.toFixed(0)}%
-                      </span>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5 max-w-[100px] mx-auto overflow-hidden">
-                        <div className={`h-1.5 rounded-full transition-all duration-500 ${isCompleted ? 'bg-gray-300' : 'bg-blue-600'}`} style={{ width: `${percent}%` }}></div>
-                      </div>
+      {/* Lista de Cards 9:16 */}
+      <div className="space-y-4 px-1 pb-10">
+        {filteredClients.length === 0 ? (
+          <div className="bg-white rounded-[2rem] p-12 text-center border border-slate-50 shadow-sm">
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] italic">Nenhum projeto encontrado</p>
+          </div>
+        ) : (
+          filteredClients.map((client) => {
+            const used = getUsedHours(client.id);
+            const balance = client.duracaoHoras - used;
+            const percent = Math.min(100, (used / client.duracaoHoras) * 100);
+            const isCompleted = client.status === 'completed';
+            const technician = getResponsibleTechnician(client);
+
+            return (
+              <div key={client.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border transition-all ${isCompleted ? 'border-slate-50 opacity-80' : 'border-slate-100 shadow-slate-200/50 hover:shadow-md'}`}>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-[9px] font-black text-blue-600 uppercase tracking-[0.2em] mb-1 truncate">{client.protocolo}</p>
+                    <h3 className="text-sm font-black text-slate-800 leading-tight truncate">{client.razãoSocial}</h3>
+                  </div>
+                  <div className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest border ${isCompleted ? 'bg-green-50 text-green-600 border-green-100' : 'bg-orange-50 text-orange-600 border-orange-100 animate-pulse'}`}>
+                    {isCompleted ? 'Finalizado' : 'Em Curso'}
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-5">
+                   <div className="flex justify-between items-end mb-2 px-0.5">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Execução</span>
+                      <span className="text-[12px] font-black text-blue-600">{percent.toFixed(0)}%</span>
+                   </div>
+                   <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden shadow-inner">
+                      <div className={`h-full rounded-full transition-all duration-700 ease-out ${isCompleted ? 'bg-green-500' : 'bg-blue-600'}`} style={{ width: `${percent}%` }}></div>
+                   </div>
+                </div>
+
+                {/* Hours Stats */}
+                <div className="grid grid-cols-3 gap-2 mb-5">
+                   <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 flex flex-col items-center">
+                      <span className="text-[7px] font-black text-slate-400 uppercase mb-1">Contratado</span>
+                      <span className="text-[10px] font-black text-slate-800">{client.duracaoHoras.toFixed(1)}h</span>
+                   </div>
+                   <div className="bg-blue-50/30 p-2.5 rounded-2xl border border-blue-100 flex flex-col items-center">
+                      <span className="text-[7px] font-black text-blue-400 uppercase mb-1">Realizado</span>
+                      <span className="text-[10px] font-black text-blue-600">{used.toFixed(1)}h</span>
+                   </div>
+                   <div className={`${balance <= 0 ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'} p-2.5 rounded-2xl border flex flex-col items-center`}>
+                      <span className={`text-[7px] font-black uppercase mb-1 ${balance <= 0 ? 'text-green-400' : 'text-orange-400'}`}>Saldo</span>
+                      <span className={`text-[10px] font-black ${balance <= 0 ? 'text-green-600' : 'text-orange-600'}`}>{balance.toFixed(1)}h</span>
+                   </div>
+                </div>
+
+                {/* Footer / Actions */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">
+                      {technician.charAt(0)}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-center text-xs font-bold text-gray-600 whitespace-nowrap">{technician}</td>
-                  <td className="px-6 py-4 text-right whitespace-nowrap">
-                    {isCompleted ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 text-gray-400 rounded-lg text-[10px] font-black uppercase shadow-sm">
-                          <svg className="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                          Finalizado {client.dataFim ? `em ${new Date(client.dataFim).toLocaleDateString('pt-BR')}` : ''}
-                        </span>
-                        <button 
-                          onClick={() => handleStartRevert(client)}
-                          className={`text-[9px] font-bold uppercase underline tracking-tighter cursor-pointer ${client.commissionPaid ? 'text-gray-300 pointer-events-none' : 'text-red-500 hover:text-red-700'}`}
-                        >
-                          Reverter
-                        </button>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => handleStartFinalize(client)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-green-100 active:scale-95"
-                      >
-                        Finalizar
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-700 leading-none">{technician.split(' ')[0]}</span>
+                      <span className="text-[7px] font-black text-slate-300 uppercase mt-0.5 tracking-tighter">Analista Responsável</span>
+                    </div>
+                  </div>
+
+                  {isCompleted ? (
+                    <button 
+                      onClick={() => handleStartRevert(client)}
+                      className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline px-2 py-1"
+                    >
+                      Reverter
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleStartFinalize(client)}
+                      className="bg-green-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-green-100 active:scale-90 transition-all"
+                    >
+                      Finalizar
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

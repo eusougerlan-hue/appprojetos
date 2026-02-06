@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity } from '../types';
-import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredLogs, deleteClient, getStoredUsers, updateClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
+import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredUsers, updateClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
 
 interface TrainingPurchaseProps {
   user: User;
@@ -14,14 +14,11 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const [availableTypes, setAvailableTypes] = useState<TrainingTypeEntity[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [allClients, setAllClients] = useState<Client[]>([]);
-  const [allLogs, setAllLogs] = useState<TrainingLog[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [isViewOnly, setIsViewOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatingProtocol, setGeneratingProtocol] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   const isManager = user.role === UserRole.MANAGER;
 
@@ -42,22 +39,20 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const loadData = async () => {
     setLoading(true);
     try {
-      const [modules, types, custs, cls, logs, users] = await Promise.all([
+      const [modules, types, custs, cls, users] = await Promise.all([
         getStoredModules(),
         getStoredTrainingTypes(),
         getStoredCustomers(),
         getStoredClients(),
-        getStoredLogs(),
         getStoredUsers()
       ]);
       setAvailableModules(modules);
       setAvailableTypes(types);
       setCustomers(custs);
       setAllClients(cls);
-      setAllLogs(logs);
       setAllUsers(users);
       
-      if (types.length > 0 && !formData.tipoTreinamento) {
+      if (types.length > 0 && !formData.tipoTreinamento && !editingId) {
         setFormData(prev => ({ ...prev, tipoTreinamento: types[0].name }));
       }
     } catch (err) {
@@ -90,104 +85,117 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
   const handleCustomerChange = (cid: string) => {
     setFormData(prev => ({ ...prev, customerId: cid, solicitante: '' }));
-    if (!editingId && cid) {
-      const completedWithBalance = allClients.filter(c => 
-        c.customerId === cid && 
-        c.status === 'completed' && 
-        (c.residualHoursAdded || 0) > 0
-      );
-      const totalBalance = completedWithBalance.reduce((acc, curr) => acc + (curr.residualHoursAdded || 0), 0);
-      if (totalBalance > 0) {
-        alert(`IDENTIFICADO SALDO POSITIVO!\n\nO cliente possui um saldo acumulado de ${totalBalance.toFixed(1)}h de contratos anteriores.`);
-        setFormData(prev => ({ ...prev, duracaoHoras: totalBalance }));
-      }
-    }
+  };
+
+  const toggleModule = (moduleName: string) => {
+    setFormData(prev => ({
+      ...prev,
+      modulos: prev.modulos.includes(moduleName)
+        ? prev.modulos.filter(m => m !== moduleName)
+        : [...prev.modulos, moduleName]
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading || isViewOnly || generatingProtocol) return;
+    if (loading || generatingProtocol) return;
 
-    if (!formData.customerId) return alert('Selecione um cliente beneficiário.');
-    if (!formData.solicitante) return alert('Selecione o solicitante (Usuário Chave).');
-    if (!formData.responsavelTecnico) return alert('Selecione um responsável técnico.');
-
+    if (!formData.customerId) return alert('ERRO: Selecione um cliente para prosseguir.');
+    if (!formData.solicitante) return alert('ERRO: Selecione o usuário chave (solicitante).');
+    
     const settings = await getStoredIntegrations();
-    
-    // Verificação Crítica: Integração precisa estar configurada para novas vendas
-    if (!editingId && !formData.protocolo) {
-      if (!settings.webhookUrl || !settings.apiKey) {
-        return alert('ERRO DE CONFIGURAÇÃO: O sistema está configurado para gerar protocolos via Integração Cloud. Por favor, vá em "Configurações > Integrações Cloud" e configure a URL do Webhook e a API Key antes de cadastrar uma nova venda.');
-      }
-    }
-
-    const selectedCustomer = customers.find(c => c.id === formData.customerId);
-    // IMPORTANTE: Busca o técnico selecionado no FORM (que pode ser o João, se o Gestor mudou)
-    const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
-    const creatorUser = allUsers.find(u => u.id === user.id);
-    const solicitanteContact = keyUsers.find(c => c.name === formData.solicitante);
-    
     let finalProtocol = formData.protocolo;
 
-    // Lógica de Protocolo OBRIGATÓRIA via Integração
-    if (!editingId && !formData.protocolo) {
+    // BLOCO DE GERAÇÃO AUTOMÁTICA DE PROTOCOLO (Somente para novas vendas)
+    if (!editingId) {
+      if (!settings.webhookUrl || !settings.apiKey) {
+        return alert('CONFIGURAÇÃO PENDENTE: Vá em Integrações Cloud e configure o Webhook e a API Key.');
+      }
+      
       setGeneratingProtocol(true);
       try {
+        const selectedCustomer = customers.find(c => c.id === formData.customerId);
+        const selectedTech = allUsers.find(u => u.name === formData.responsavelTecnico);
+        const creatorUser = allUsers.find(u => u.id === user.id);
+        const selectedContact = selectedCustomer?.contacts?.find(c => c.name === formData.solicitante);
+        
+        // PAYLOAD COM CAMPO EVENT INCLUÍDO E NOVOS CAMPOS DE USUÁRIO E SOLICITANTE
         const payload = {
-          event: 'generate_movidesk_protocol',
+          event: 'generate_movidesk_protocol', // Identificador da ação
           apiKey: settings.apiKey,
-          razao_social: selectedCustomer?.razãoSocial,
-          cnpj: selectedCustomer?.cnpj,
-          ref_movidesk: selectedCustomer?.refMovidesk || '', 
-          usuario_movidesk_criador: creatorUser?.usuarioMovidesk || user.usuarioMovidesk || '',
-          // Envia o usuário movidesk do técnico ESCOLHIDO no dropdown
+          razao_social: selectedCustomer?.razãoSocial || '',
+          cnpj: selectedCustomer?.cnpj || '',
+          ref_movidesk: selectedCustomer?.refMovidesk || '',
+          responsavel: formData.responsavelTecnico, // NOVO CAMPO SOLICITADO
+          responsavel_tecnico: formData.responsavelTecnico,
           usuario_movidesk_responsavel: selectedTech?.usuarioMovidesk || '',
-          usuario_movidesk: selectedTech?.usuarioMovidesk || '', 
-          modulos: formData.modulos,
+          usuario_movidesk_criador: creatorUser?.usuarioMovidesk || user.usuarioMovidesk || '',
           tipo_treinamento: formData.tipoTreinamento,
           solicitante: formData.solicitante,
-          solicitante_telefone: solicitanteContact?.phone || '',
-          solicitante_email: solicitanteContact?.email || '',
-          responsavel: formData.responsavelTecnico,
-          valor_implantacao: formData.valorImplantacao,
-          carga_horaria: formData.duracaoHoras,
-          observacao: formData.observacao,
+          solicitante_telefone: selectedContact?.phone || '',
+          solicitante_email: selectedContact?.email || '',
+          modulos: formData.modulos.join(', '), 
+          modulos_array: formData.modulos,
+          duracao_horas: Number(formData.duracaoHoras),
+          data_inicio: formData.dataInicio,
+          valor_contrato: Number(formData.valorImplantacao),
+          comissao_percent: Number(formData.comissaoPercent),
+          observacao: formData.observacao.trim(),
           timestamp: new Date().toISOString()
         };
 
+        console.log('--- ENVIANDO REQUISIÇÃO AO WEBHOOK ---', payload);
+
         const response = await fetch(settings.webhookUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify(payload)
         });
 
+        // Captura a resposta como texto primeiro para evitar "Unexpected end of JSON input"
+        const responseText = await response.text();
+        console.log('--- RESPOSTA BRUTA DO SERVIDOR ---', responseText);
+
         if (!response.ok) {
-          throw new Error(`Servidor de Integração retornou erro ${response.status}`);
+          throw new Error(`Falha no Servidor de Automação (${response.status}): ${responseText || 'Sem mensagem de erro.'}`);
         }
 
-        const rawData = await response.json();
-        const data = Array.isArray(rawData) ? rawData[0] : rawData;
+        if (!responseText || responseText.trim() === "") {
+          throw new Error('O servidor respondeu com sucesso (200 OK), mas o corpo da resposta está vazio. Verifique seu fluxo n8n.');
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          throw new Error(`O servidor não retornou um JSON válido. Resposta: "${responseText.substring(0, 100)}"`);
+        }
+
+        const result = Array.isArray(data) ? data[0] : data;
         
-        if (data && data.protocolo) {
-          finalProtocol = data.protocolo;
+        if (result && result.protocolo) {
+          finalProtocol = String(result.protocolo);
+          console.log('Protocolo recebido com sucesso:', finalProtocol);
         } else {
-          throw new Error('A integração n8n não retornou o campo "protocolo" esperado.');
+          throw new Error('A automação não incluiu o campo "protocolo" no JSON de resposta.');
         }
       } catch (err: any) {
+        console.error('Falha crítica na geração do protocolo:', err);
+        alert(`ERRO DE INTEGRAÇÃO:\n\n${err.message}\n\nNota: Verifique os logs do seu workflow n8n.`);
         setGeneratingProtocol(false);
-        return alert(`FALHA NA INTEGRAÇÃO: Não foi possível gerar o protocolo no Movidesk.\n\nDetalhes: ${err.message}\n\nA venda não foi salva. Verifique o log do n8n.`);
+        return; 
       } finally {
         setGeneratingProtocol(false);
       }
     }
 
-    // Se chegou aqui e não tem protocolo (em caso de nova venda), algo deu muito errado no fluxo acima
-    if (!editingId && !finalProtocol) {
-      return alert('ERRO CRÍTICO: O número do protocolo é obrigatório e não foi gerado pela integração.');
-    }
-
+    // SALVAMENTO NO SUPABASE
     setLoading(true);
     try {
+      const selectedCustomer = customers.find(c => c.id === formData.customerId);
       const clientData: Client = {
         id: editingId || Math.random().toString(36).substr(2, 9), 
         customerId: formData.customerId,
@@ -215,63 +223,19 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       setViewMode('list');
       onComplete(); 
     } catch (err: any) {
-      console.error('Erro ao salvar no Supabase:', err);
-      alert(`ERRO AO SALVAR NO BANCO: ${err.message || 'Verifique sua conexão.'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const performDelete = async (id: string) => {
-    const client = allClients.find(c => c.id === id);
-    if (client?.status === 'completed') {
-      alert('SEGURANÇA: Projetos FINALIZADOS não podem ser excluídos.');
-      setConfirmDeleteId(null);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await deleteClient(id);
-      setAllClients(prev => prev.filter(c => c.id !== id));
-      setConfirmDeleteId(null);
-    } catch (err) {
-      alert('Erro ao excluir venda.');
+      console.error('Erro ao salvar no banco:', err);
+      alert('ERRO AO SALVAR: Protocolo gerado, mas falha ao gravar os dados.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleEdit = (client: Client) => {
-    if (client.status === 'completed') {
-      alert('Contrato finalizado é imutável.');
-      return;
-    }
     setEditingId(client.id);
-    setIsViewOnly(false);
     setFormData({
       customerId: client.customerId,
       protocolo: client.protocolo,
-      modulos: client.modulos,
-      tipoTreinamento: client.tipoTreinamento,
-      solicitante: client.solicitante || '',
-      duracaoHoras: client.duracaoHoras,
-      dataInicio: client.dataInicio,
-      valorImplantacao: client.valorImplantacao,
-      comissaoPercent: client.comissaoPercent,
-      responsavelTecnico: client.responsavelTecnico,
-      observacao: client.observacao || ''
-    });
-    setViewMode('form');
-  };
-
-  const handleView = (client: Client) => {
-    setEditingId(client.id);
-    setIsViewOnly(true);
-    setFormData({
-      customerId: client.customerId,
-      protocolo: client.protocolo,
-      modulos: client.modulos,
+      modulos: client.modulos || [],
       tipoTreinamento: client.tipoTreinamento,
       solicitante: client.solicitante || '',
       duracaoHoras: client.duracaoHoras,
@@ -286,8 +250,6 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
   const resetForm = () => {
     setEditingId(null);
-    setIsViewOnly(false);
-    setConfirmDeleteId(null);
     setFormData({
       customerId: '',
       protocolo: '',
@@ -298,254 +260,202 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       dataInicio: new Date().toISOString().split('T')[0],
       valorImplantacao: 0,
       comissaoPercent: 0,
-      responsavelTecnico: user.name, // Por padrão, o técnico logado
+      responsavelTecnico: user.name,
       observacao: ''
     });
   };
 
-  const toggleModule = (name: string) => {
-    setFormData(prev => ({
-      ...prev,
-      modulos: prev.modulos.includes(name)
-        ? prev.modulos.filter(m => m !== name)
-        : [...prev.modulos, name]
-    }));
-  };
-
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 animate-fadeIn overflow-hidden">
-        <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white sticky top-0 z-10">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden animate-fadeIn">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
           <div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">Vendas de Treinamento</h2>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de novos contratos e protocolos</p>
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Vendas Recentes</h2>
+            <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Gestão de Contratos Ativos</p>
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
-             <div className="relative flex-1">
-                <input type="text" placeholder="Buscar cliente..." className="w-full pl-9 pr-4 py-3 text-[11px] border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-bold bg-slate-50/50" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-             </div>
-             <button onClick={() => { resetForm(); setViewMode('form'); }} className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[11px] font-black shadow-xl shadow-blue-100 active:scale-95 flex items-center gap-2 uppercase tracking-widest flex-shrink-0 transition-all">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                Nova Venda
-             </button>
-          </div>
+          <button onClick={() => { resetForm(); setViewMode('form'); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Nova Venda</button>
         </div>
-        <div className="overflow-x-auto min-h-[300px]">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/50">
-              <tr>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocolo / Cliente</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Horas</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {visibleClients.length === 0 ? (
-                <tr>
-                   <td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold italic">Nenhum registro encontrado.</td>
-                </tr>
-              ) : visibleClients.map(client => (
-                <tr key={client.id} className={`hover:bg-slate-50 transition-colors ${client.status === 'completed' ? 'bg-emerald-50/20' : ''}`}>
-                  <td className="px-8 py-5">
-                    <button 
-                      onClick={() => handleView(client)}
-                      className="text-left group/protocol outline-none"
-                    >
-                      <p className="font-black text-slate-700 text-sm leading-tight group-hover/protocol:text-blue-600 group-hover/protocol:underline transition-all">
-                        {client.protocolo || 'SEM PROTOCOLO'}
-                      </p>
-                    </button>
-                    <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter mt-1">{client.razãoSocial}</p>
-                  </td>
-                  <td className="px-8 py-5 text-center font-black text-slate-700 text-sm">{client.duracaoHoras}h</td>
-                  <td className="px-8 py-5 text-center">
-                    <span className={`text-[9px] font-black px-2 py-1 rounded-full border ${
-                      client.status === 'pending' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-green-50 text-green-600 border-green-100'
-                    }`}>
-                      {client.status === 'pending' ? 'PENDENTE' : 'FINALIZADO'}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => handleEdit(client)} className={`p-2 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200' : 'text-blue-600 hover:bg-blue-50'}`} disabled={client.status === 'completed'}>
-                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      </button>
-                      <button onClick={() => setConfirmDeleteId(client.id)} className={`p-2 rounded-xl transition-all ${client.status === 'completed' ? 'text-slate-200' : 'text-red-400 hover:bg-red-50'}`} disabled={client.status === 'completed'}>
-                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </div>
-                    {confirmDeleteId === client.id && (
-                       <div className="flex justify-end gap-2 mt-2 animate-fadeIn">
-                          <button onClick={() => performDelete(client.id)} className="bg-red-600 text-white px-3 py-1 text-[9px] font-black rounded-lg">Confirmar?</button>
-                          <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-100 text-slate-500 px-3 py-1 text-[9px] font-black rounded-lg">Sair</button>
-                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        
+        <div className="p-4 bg-slate-50/30 border-b border-slate-50">
+          <input 
+            type="text" 
+            placeholder="Pesquisar cliente..." 
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold text-xs bg-white"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pb-10">
+          {visibleClients.map(client => (
+            <div key={client.id} className="p-4 border border-slate-100 rounded-2xl bg-white flex justify-between items-center shadow-sm hover:shadow-md transition-all">
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="text-[9px] font-black text-blue-600 uppercase mb-0.5 truncate">{client.protocolo || 'AGUARDANDO GERAÇÃO'}</p>
+                <p className="font-bold text-slate-800 text-xs truncate leading-tight">{client.razãoSocial}</p>
+                <div className="flex items-center gap-2 mt-1">
+                   <span className="text-[7px] bg-slate-50 text-slate-400 px-1.5 py-0.5 rounded border border-slate-100 font-black uppercase">{client.tipoTreinamento}</span>
+                   <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">{client.duracaoHoras}h Contratadas</span>
+                </div>
+              </div>
+              <button onClick={() => handleEdit(client)} className="bg-slate-50 text-blue-600 p-2.5 rounded-xl hover:bg-blue-50 transition-all">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              </button>
+            </div>
+          ))}
+          {visibleClients.length === 0 && (
+            <div className="text-center py-20">
+               <p className="text-slate-300 text-[10px] font-black uppercase tracking-[0.2em] italic">Nenhuma venda encontrada</p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 animate-slideUp max-w-4xl mx-auto overflow-hidden relative">
-        {(generatingProtocol || loading) && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center animate-fadeIn">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-            <div className="text-center">
-               <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">
-                 {generatingProtocol ? 'Sincronizando com Movidesk via n8n...' : 'Persistindo dados no Supabase...'}
-               </h3>
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] px-10 leading-relaxed">
-                 {generatingProtocol ? 'Aguardando geração do protocolo oficial...' : 'Salvando venda na base de dados...'}
-               </p>
+    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 animate-slideUp overflow-hidden relative">
+      {(generatingProtocol || loading) && (
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-10 text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-8 shadow-xl"></div>
+          <h3 className="text-base font-black text-slate-800 uppercase tracking-widest">Sincronizando com n8n</h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase mt-3 leading-relaxed max-w-[240px]">
+            {generatingProtocol ? 'Aguardando resposta da automação Movidesk...' : 'Salvando dados no sistema...'}
+          </p>
+        </div>
+      )}
+
+      <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+        <div>
+           <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">{editingId ? 'Editar Contrato' : 'Nova Venda'}</h2>
+           <p className="text-[8px] text-slate-400 font-black uppercase mt-1.5 tracking-widest">Geração de Projeto</p>
+        </div>
+        <button onClick={() => setViewMode('list')} className="text-slate-400 p-2 hover:bg-slate-100 rounded-full transition-all">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="overflow-y-auto max-h-[640px] custom-scrollbar">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 pb-20">
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cliente Corporativo</label>
+              <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 outline-none font-bold text-slate-700 bg-slate-50/50 text-xs appearance-none transition-all focus:border-blue-500 shadow-inner" value={formData.customerId} onChange={e => handleCustomerChange(e.target.value)} required disabled={!!editingId}>
+                <option value="">Selecione o cliente...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.razãoSocial}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-black text-blue-500 uppercase tracking-widest mb-2 ml-1">Protocolo (Obrigatório Automático)</label>
+              <div className="w-full px-5 py-4 rounded-2xl border-2 border-blue-50 font-black text-blue-600 bg-blue-50/20 text-[10px] flex items-center shadow-inner">
+                {editingId ? formData.protocolo : 'GERAR PROTOCOLO NO CLIQUE ABAIXO'}
+              </div>
             </div>
           </div>
-        )}
 
-        <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
-            <div>
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                {isViewOnly ? 'Visualizar Venda' : editingId ? 'Editar Contrato' : 'Nova Venda de Treinamento'}
-              </h2>
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2">Protocolo Automático Ativado</p>
-            </div>
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-            </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-10 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Cliente Beneficiário</label>
-                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/50 transition-all disabled:opacity-50" value={formData.customerId} onChange={e => handleCustomerChange(e.target.value)} required disabled={isViewOnly || !!editingId}>
-                  <option value="">Selecione o cliente da base...</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.razãoSocial}</option>)}
+          <div className="grid grid-cols-1 gap-4">
+             <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Usuário Chave (Solicitante)</label>
+                <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 outline-none font-bold text-slate-700 bg-slate-50/50 text-xs appearance-none" value={formData.solicitante} onChange={e => setFormData({...formData, solicitante: e.target.value})} required disabled={!formData.customerId}>
+                  <option value="">Quem solicitou?</option>
+                  {keyUsers.map((u, i) => <option key={i} value={u.name}>{u.name}</option>)}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Número do Protocolo</label>
-                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-blue-600 bg-slate-100 cursor-not-allowed" value={formData.protocolo} readOnly placeholder="Aguardando integração..." />
-                <p className="text-[9px] text-gray-400 mt-2 ml-1 italic font-bold">* Gerado via Movidesk após clicar em confirmar.</p>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Tipo de Treinamento</label>
-                <select className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/50 transition-all" value={formData.tipoTreinamento} onChange={e => setFormData({...formData, tipoTreinamento: e.target.value})} required disabled={isViewOnly}>
-                    {availableTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+             </div>
+             <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tipo de Treinamento</label>
+                <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 font-bold text-slate-700 bg-slate-50/50 text-xs appearance-none" value={formData.tipoTreinamento} onChange={e => setFormData({...formData, tipoTreinamento: e.target.value})} required>
+                   {availableTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                 </select>
-              </div>
+             </div>
+          </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Solicitante (Usuário Chave)</label>
-                <select 
-                  className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-blue-600 bg-slate-50/50 transition-all disabled:opacity-50" 
-                  value={formData.solicitante} 
-                  onChange={e => setFormData({...formData, solicitante: e.target.value})} 
-                  required 
-                  disabled={isViewOnly || !formData.customerId}
-                >
-                  <option value="">Selecione um Usuário Chave...</option>
-                  {keyUsers.map((contact, idx) => (
-                    <option key={idx} value={contact.name}>{contact.name}</option>
-                  ))}
-                  {formData.customerId && keyUsers.length === 0 && (
-                    <option disabled value="">⚠️ Nenhum Usuário Chave cadastrado para este cliente</option>
-                  )}
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Módulos do Sistema Contratados</label>
-                <div className="flex flex-wrap gap-2">
-                   {availableModules.map(mod => {
-                     const active = formData.modulos.includes(mod.name);
-                     return (
-                       <button key={mod.id} type="button" onClick={() => toggleModule(mod.name)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black border transition-all ${active ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400'}`} disabled={isViewOnly}>
-                         {mod.name}
-                       </button>
-                     );
-                   })}
-                </div>
-              </div>
-
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-50">
-                  <div className="space-y-3">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Data de Início</label>
-                    <input type="date" className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-gray-700 bg-slate-50/50 transition-all" value={formData.dataInicio} onChange={e => setFormData({...formData, dataInicio: e.target.value})} required disabled={isViewOnly} />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Responsável Técnico</label>
-                    <select 
-                      className={`w-full px-6 py-4 rounded-2xl border-2 outline-none font-bold transition-all appearance-none ${
-                        !isManager && !isViewOnly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-50/50 border-slate-200 focus:border-blue-500 text-blue-600'
-                      }`}
-                      value={formData.responsavelTecnico} 
-                      onChange={e => setFormData({...formData, responsavelTecnico: e.target.value})} 
-                      required 
-                      disabled={isViewOnly || !isManager}
-                    >
-                      {allUsers.filter(u => u.active !== false).map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-                    </select>
-                    {!isManager && !isViewOnly && (
-                      <p className="text-[9px] text-gray-400 mt-1 ml-1 italic font-bold">Apenas gestores podem alterar o responsável técnico.</p>
-                    )}
-                  </div>
-              </div>
-
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-50">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Carga Horária (h)</label>
-                    <input type="number" step="0.5" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-gray-700 bg-slate-50/50" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required disabled={isViewOnly} />
-                  </div>
-                  <div className="opacity-60 grayscale-[0.5]">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Valor Contrato (R$)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-slate-400 bg-slate-100 cursor-not-allowed" 
-                      value={formData.valorImplantacao} 
-                      readOnly 
-                      placeholder="Bloqueado"
-                    />
-                  </div>
-                  <div className="opacity-60 grayscale-[0.5]">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Comissão (%)</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-bold text-slate-400 bg-slate-100 cursor-not-allowed" 
-                      value={formData.comissaoPercent} 
-                      readOnly 
-                      placeholder="Bloqueado"
-                    />
-                  </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Informações Adicionais / Observação</label>
-                <textarea className="w-full px-6 py-4 rounded-2xl border border-slate-200 outline-none font-medium text-slate-600 bg-slate-50/50 transition-all resize-none min-h-[120px]" value={formData.observacao} onChange={e => setFormData({...formData, observacao: e.target.value})} placeholder="Insira detalhes sobre a venda ou logística..." disabled={isViewOnly} />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-4 pt-10 border-t border-slate-100">
-               <button type="button" onClick={() => setViewMode('list')} className="px-10 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600">
-                 {isViewOnly ? 'FECHAR' : 'CANCELAR'}
-               </button>
-               {!isViewOnly && (
-                 <button type="submit" disabled={generatingProtocol || loading} className="px-16 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-2xl shadow-blue-100 transition-all active:scale-95 uppercase tracking-widest text-[10px]">
-                   {loading ? 'SALVANDO...' : generatingProtocol ? 'GERANDO PROTOCOLO...' : editingId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR E GERAR PROTOCOLO'}
+          <div>
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Módulos Contratados</label>
+            <div className="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-[1.5rem] border border-slate-100">
+               {availableModules.map(mod => (
+                 <button 
+                  key={mod.id} 
+                  type="button" 
+                  onClick={() => toggleModule(mod.name)}
+                  className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${
+                    formData.modulos.includes(mod.name) 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                      : 'bg-white text-slate-400 border-slate-200'
+                  }`}
+                 >
+                   {mod.name}
                  </button>
-               )}
+               ))}
             </div>
+          </div>
+
+          <div className="bg-emerald-50/30 p-5 rounded-[2rem] border border-emerald-100/50 space-y-5">
+             <h4 className="text-[9px] font-black text-emerald-600 uppercase tracking-widest px-1">Escopo e Valores</h4>
+             <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[8px] font-black text-emerald-600/60 uppercase mb-1.5 ml-1">Carga Horária (H)</label>
+                  <input type="number" step="0.5" className="w-full px-4 py-3 rounded-xl border border-white font-bold text-emerald-700 bg-white shadow-sm text-xs" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-black text-emerald-600/60 uppercase mb-1.5 ml-1">Data Início</label>
+                  <input type="date" className="w-full px-4 py-3 rounded-xl border border-white font-bold text-emerald-700 bg-white shadow-sm text-[10px]" value={formData.dataInicio} onChange={e => setFormData({...formData, dataInicio: e.target.value})} required />
+                </div>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="block text-[8px] font-black text-emerald-600/60 uppercase mb-1.5 ml-1">Valor Contrato (R$)</label>
+                   <input 
+                    type="number" 
+                    className="w-full px-4 py-3 rounded-xl border border-white font-bold text-emerald-800 bg-white shadow-sm text-xs" 
+                    value={formData.valorImplantacao} 
+                    onChange={e => setFormData({...formData, valorImplantacao: Number(e.target.value)})} 
+                    placeholder="0.00"
+                   />
+                </div>
+                <div>
+                   <label className="block text-[8px] font-black text-emerald-600/60 uppercase mb-1.5 ml-1">Comissão (%)</label>
+                   <input 
+                    type="number" 
+                    className="w-full px-4 py-3 rounded-xl border border-white font-bold text-emerald-800 bg-white shadow-sm text-xs" 
+                    value={formData.comissaoPercent} 
+                    onChange={e => setFormData({...formData, comissaoPercent: Number(e.target.value)})} 
+                    placeholder="%"
+                   />
+                </div>
+             </div>
+          </div>
+
+          <div>
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Técnico Atribuído</label>
+            <select 
+              className={`w-full px-5 py-4 rounded-2xl border-2 outline-none font-bold text-xs appearance-none transition-all ${
+                !isManager ? 'bg-slate-100 border-slate-100 text-slate-400' : 'bg-slate-50/50 border-slate-50 text-blue-600'
+              }`}
+              value={formData.responsavelTecnico} 
+              onChange={e => setFormData({...formData, responsavelTecnico: e.target.value})} 
+              required 
+              disabled={!isManager}
+            >
+              {allUsers.filter(u => u.active !== false).map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Observações Internas</label>
+             <textarea 
+               className="w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 font-bold bg-slate-50/50 text-xs resize-none h-24 focus:border-blue-500 outline-none transition-all"
+               value={formData.observacao}
+               onChange={(e) => setFormData({...formData, observacao: e.target.value})}
+               placeholder="Notas sobre a venda ou projeto..."
+             ></textarea>
+          </div>
+
+          <button type="submit" disabled={generatingProtocol || loading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-[0.2em] text-[10px] active:scale-95 transition-all mt-6">
+            {editingId ? 'Salvar Alterações' : 'Confirmar e Gerar Protocolo'}
+          </button>
         </form>
+      </div>
     </div>
   );
 };
