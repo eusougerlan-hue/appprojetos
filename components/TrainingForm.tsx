@@ -87,6 +87,75 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     return formData.shifts.reduce((acc, shift) => acc + calc(shift.start, shift.end), 0);
   };
 
+  // FUNÇÃO PARA DISPARO DO WEBHOOK (ESTRUTURA RESTAURADA PARA N8N COM NOVOS CAMPOS E PARTICIPANTES DETALHADOS)
+  const triggerLogWebhook = async (logData: TrainingLog, client: Client) => {
+    const settings = await getStoredIntegrations();
+    if (!settings.webhookUrl) return;
+
+    try {
+      // Objeto LOG com todos os campos solicitados para o ticket
+      const logPayload: any = {
+        numeroProtocolo: logData.numeroProtocolo,
+        date: logData.date,
+        startTime1: logData.startTime1,
+        endTime1: logData.endTime1,
+        startTime2: logData.startTime2 || '',
+        endTime2: logData.endTime2 || '',
+        observation: logData.observation,
+        transportType: logData.transportType,
+        employeeName: logData.employeeName, // NOVO: Nome do instrutor
+        horasCalculadas: logData.horasCalculadas, // NOVO: Horas totais da sessão
+        participantes: logData.receivedBy?.map(p => ({
+          nome: p.name,
+          telefone: p.phone,
+          email: p.email
+        })) || [] // NOVO: Dados detalhados dos participantes
+      };
+
+      // REGRA DE LOGÍSTICA: Adiciona detalhes de transporte APENAS se não for ONLINE
+      if (logData.transportType === TransportType.UBER) {
+        logPayload.uberIda = logData.uberIda;
+        logPayload.uberVolta = logData.uberVolta;
+        logPayload.uberTotal = logData.uberTotal;
+      } else if (logData.transportType === TransportType.OWN_VEHICLE) {
+        logPayload.ownVehicleKm = logData.ownVehicleKm;
+        logPayload.ownVehicleKmValue = logData.ownVehicleKmValue;
+        logPayload.ownVehicleTotal = logData.ownVehicleTotal;
+      }
+
+      // Objeto CLIENT com os campos solicitados
+      const clientPayload = {
+        tipoTreinamento: client.tipoTreinamento,
+        modulos: client.modulos,
+        duracaoContratada: client.duracaoHoras,
+        status: client.status
+      };
+
+      const finalPayload = {
+        event: 'training_log_created',
+        apiKey: settings.apiKey,
+        log: logPayload,
+        client: clientPayload,
+        tecnico: logData.employeeName,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('--- ENVIANDO AO N8N (LOG COMPLETO COM PARTICIPANTES) ---', finalPayload);
+      
+      const response = await fetch(settings.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalPayload)
+      });
+
+      if (response.ok) {
+        console.log('Webhook n8n disparado com sucesso.');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar dados ao n8n:', error);
+    }
+  };
+
   const handleEdit = (log: TrainingLog) => {
     setEditingLogId(log.id);
     const initialShifts = [{ start: log.startTime1, end: log.endTime1 }];
@@ -154,7 +223,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.clientId) return alert('Selecione um cliente');
+    if (!formData.clientId || !selectedClient) return alert('Selecione um cliente');
     if (!formData.shifts[0]?.start || !formData.shifts[0]?.end) return alert('Preencha pelo menos o primeiro horário');
 
     setLoading(true);
@@ -189,11 +258,14 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
         await saveLog(logData);
       }
       
+      // DISPARA O WEBHOOK COM A ESTRUTURA COMPLETA
+      await triggerLogWebhook(logData, selectedClient);
+      
       onComplete();
       setViewMode('list');
       resetForm();
     } catch (err) {
-      alert('Erro ao salvar registro.');
+      alert('Erro ao salvar registro no banco de dados.');
     } finally {
       setLoading(false);
     }
@@ -329,6 +401,56 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
               <option value={TransportType.OWN_VEHICLE}>Carro Próprio</option>
             </select>
           </div>
+
+          {formData.transportType === TransportType.UBER && (
+            <div className="grid grid-cols-2 gap-3 animate-fadeIn">
+               <div>
+                  <label className="block text-[8px] font-black text-blue-500 uppercase mb-1 ml-1">Uber Ida (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 font-bold text-slate-700 text-xs" 
+                    value={formData.uberIda} 
+                    onChange={e => setFormData({...formData, uberIda: Number(e.target.value)})} 
+                  />
+               </div>
+               <div>
+                  <label className="block text-[8px] font-black text-blue-500 uppercase mb-1 ml-1">Uber Volta (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 font-bold text-slate-700 text-xs" 
+                    value={formData.uberVolta} 
+                    onChange={e => setFormData({...formData, uberVolta: Number(e.target.value)})} 
+                  />
+               </div>
+            </div>
+          )}
+
+          {formData.transportType === TransportType.OWN_VEHICLE && (
+            <div className="grid grid-cols-2 gap-3 animate-fadeIn">
+               <div>
+                  <label className="block text-[8px] font-black text-blue-500 uppercase mb-1 ml-1">KM Rodados</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 font-bold text-slate-700 text-xs" 
+                    value={formData.ownVehicleKm} 
+                    onChange={e => setFormData({...formData, ownVehicleKm: Number(e.target.value)})} 
+                  />
+               </div>
+               <div>
+                  <label className="block text-[8px] font-black text-blue-500 uppercase mb-1 ml-1">R$ por KM</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 font-bold text-slate-700 text-xs" 
+                    value={formData.ownVehicleKmValue} 
+                    onChange={e => setFormData({...formData, ownVehicleKmValue: Number(e.target.value)})} 
+                  />
+               </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Participantes</label>
