@@ -17,8 +17,6 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchInitialData = async () => {
     try {
@@ -46,10 +44,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const [formData, setFormData] = useState({
     clientId: '',
     date: new Date().toISOString().split('T')[0],
-    startTime1: '',
-    endTime1: '',
-    startTime2: '',
-    endTime2: '',
+    shifts: [{ start: '', end: '' }] as { start: string, end: string }[],
     receivedBy: [] as Contact[],
     observation: '',
     transportType: TransportType.ONLINE,
@@ -86,20 +81,22 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       if (!start || !end) return 0;
       const s = start.split(':').map(Number);
       const e = end.split(':').map(Number);
-      return (e[0] - s[0]) + (e[1] - s[1]) / 60;
+      const diff = (e[0] - s[0]) + (e[1] - s[1]) / 60;
+      return diff > 0 ? diff : 0;
     };
-    return calc(formData.startTime1, formData.endTime1) + calc(formData.startTime2, formData.endTime2);
+    return formData.shifts.reduce((acc, shift) => acc + calc(shift.start, shift.end), 0);
   };
 
   const handleEdit = (log: TrainingLog) => {
     setEditingLogId(log.id);
+    const initialShifts = [{ start: log.startTime1, end: log.endTime1 }];
+    if (log.startTime2 && log.endTime2) {
+      initialShifts.push({ start: log.startTime2, end: log.endTime2 });
+    }
     setFormData({
       clientId: log.clientId,
       date: log.date,
-      startTime1: log.startTime1,
-      endTime1: log.endTime1,
-      startTime2: log.startTime2 || '',
-      endTime2: log.endTime2 || '',
+      shifts: initialShifts,
       receivedBy: log.receivedBy || [],
       observation: log.observation,
       transportType: log.transportType || TransportType.ONLINE,
@@ -116,10 +113,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     setFormData({
       clientId: '',
       date: new Date().toISOString().split('T')[0],
-      startTime1: '',
-      endTime1: '',
-      startTime2: '',
-      endTime2: '',
+      shifts: [{ start: '', end: '' }],
       receivedBy: [],
       observation: '',
       transportType: TransportType.ONLINE,
@@ -127,6 +121,25 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       uberVolta: 0,
       ownVehicleKm: 0,
       ownVehicleKmValue: 0
+    });
+  };
+
+  const addShift = () => {
+    if (formData.shifts.length >= 2) {
+      alert("O sistema atual suporta até 2 turnos por registro de atendimento.");
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      shifts: [...prev.shifts, { start: '', end: '' }]
+    }));
+  };
+
+  const updateShift = (index: number, field: 'start' | 'end', value: string) => {
+    setFormData(prev => {
+      const newShifts = [...prev.shifts];
+      newShifts[index] = { ...newShifts[index], [field]: value };
+      return { ...prev, shifts: newShifts };
     });
   };
 
@@ -142,7 +155,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.clientId) return alert('Selecione um cliente');
-    if (!formData.startTime1 || !formData.endTime1) return alert('Preencha os horários do 1º turno');
+    if (!formData.shifts[0]?.start || !formData.shifts[0]?.end) return alert('Preencha pelo menos o primeiro horário');
 
     setLoading(true);
     try {
@@ -153,10 +166,10 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
         employeeId: user.id,
         employeeName: user.name,
         date: formData.date,
-        startTime1: formData.startTime1,
-        endTime1: formData.endTime1,
-        startTime2: formData.startTime2,
-        endTime2: formData.endTime2,
+        startTime1: formData.shifts[0]?.start || '',
+        endTime1: formData.shifts[0]?.end || '',
+        startTime2: formData.shifts[1]?.start || '',
+        endTime2: formData.shifts[1]?.end || '',
         receivedBy: formData.receivedBy,
         observation: formData.observation,
         transportType: formData.transportType,
@@ -208,7 +221,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
           />
         </div>
 
-        <div className="max-h-[500px] overflow-y-auto">
+        <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
           {logs.length === 0 ? (
             <p className="p-10 text-center text-slate-400 text-[10px] font-bold uppercase">Sem registros</p>
           ) : (
@@ -239,8 +252,8 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     <div className="bg-white rounded-3xl animate-slideUp overflow-hidden">
       <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
         <div>
-          <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Novo Atendimento</h2>
-          <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Gestão de Horas do Técnico</p>
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">NOVO ATENDIMENTO</h2>
+          <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-1.5">Gestão de Horas do Técnico</p>
         </div>
         <button onClick={() => setViewMode('list')} className="text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
       </div>
@@ -268,23 +281,49 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
             </div>
             <div>
               <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Protocolo</label>
-              <div className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-50 font-black bg-slate-50 text-slate-400 text-[9px] truncate h-[46px] flex items-center">
+              <div className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-50 font-black bg-slate-50/50 text-slate-400 text-[9px] truncate h-[46px] flex items-center">
                 {selectedClient?.protocolo || 'Nenhum'}
               </div>
             </div>
           </div>
 
-          <div className="bg-blue-50/50 p-4 rounded-2xl space-y-4 border border-blue-100">
-            <h4 className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Horários</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <input type="time" className="w-full px-3 py-3 rounded-xl border-2 border-white font-black text-slate-700 text-xs" value={formData.startTime1} onChange={(e) => setFormData({...formData, startTime1: e.target.value})} required />
-              <input type="time" className="w-full px-3 py-3 rounded-xl border-2 border-white font-black text-slate-700 text-xs" value={formData.endTime1} onChange={(e) => setFormData({...formData, endTime1: e.target.value})} required />
+          <div className="bg-blue-50/30 p-4 rounded-[1.5rem] space-y-4 border border-blue-50">
+            <div className="flex justify-between items-center mb-1">
+              <h4 className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Horários</h4>
+              <button 
+                type="button"
+                onClick={addShift}
+                className="w-7 h-7 bg-white border-2 border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shadow-sm active:scale-90 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {formData.shifts.map((shift, index) => (
+                <div key={index} className="grid grid-cols-2 gap-3 animate-fadeIn">
+                  <input 
+                    type="time" 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-white font-black text-slate-700 text-xs shadow-sm" 
+                    value={shift.start} 
+                    onChange={(e) => updateShift(index, 'start', e.target.value)} 
+                    required 
+                  />
+                  <input 
+                    type="time" 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-white font-black text-slate-700 text-xs shadow-sm" 
+                    value={shift.end} 
+                    onChange={(e) => updateShift(index, 'end', e.target.value)} 
+                    required 
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
           <div>
             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Logística</label>
-            <select className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 text-xs" value={formData.transportType} onChange={(e) => setFormData({...formData, transportType: e.target.value as TransportType})}>
+            <select className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 text-xs bg-slate-50/50 appearance-none" value={formData.transportType} onChange={(e) => setFormData({...formData, transportType: e.target.value as TransportType})}>
               <option value={TransportType.ONLINE}>Online</option>
               <option value={TransportType.UBER}>Uber</option>
               <option value={TransportType.OWN_VEHICLE}>Carro Próprio</option>
@@ -293,13 +332,13 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
           <div>
             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Participantes</label>
-            <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-h-[60px]">
+            <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 min-h-[60px]">
               {availableContacts.map(contact => (
                 <button 
                   key={contact.name} 
                   type="button" 
                   onClick={() => toggleContactSelection(contact)} 
-                  className={`px-3 py-1.5 rounded-lg text-[8px] font-black border transition-all ${formData.receivedBy.some(c => c.name === contact.name) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                  className={`px-3 py-1.5 rounded-xl text-[8px] font-black border transition-all ${formData.receivedBy.some(c => c.name === contact.name) ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}
                 >
                   {contact.name}
                 </button>
@@ -310,11 +349,11 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
           <div>
             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Observações</label>
-            <textarea className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 h-24 text-xs font-bold text-slate-700 outline-none resize-none" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="O que foi treinado hoje?"></textarea>
+            <textarea className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 h-24 text-xs font-bold text-slate-700 outline-none resize-none bg-slate-50/30" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="O que foi treinado hoje?"></textarea>
           </div>
         </div>
 
-        <button type="submit" disabled={loading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest text-[10px] active:scale-95 transition-all">
+        <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-[0.2em] text-[10px] active:scale-95 transition-all mt-4">
           {loading ? 'Salvando...' : 'Confirmar Atendimento'}
         </button>
       </form>
