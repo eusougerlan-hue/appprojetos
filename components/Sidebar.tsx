@@ -21,9 +21,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
         setView(view);
         if (onClose) onClose();
       }}
-      className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-300 ${
+      className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 ${
         currentView === view 
-          ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 translate-x-1' 
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 translate-x-1' 
           : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
       }`}
     >
@@ -36,18 +36,18 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
 
   return (
     <>
-      {/* Backdrop Mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden animate-fadeIn" 
-          onClick={onClose}
-        />
-      )}
+      {/* Backdrop Mobile: Exibe fundo escuro quando o menu abre no mobile */}
+      <div 
+        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden transition-opacity duration-300 ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
+      />
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container: Fixa em LG, Drawer em telas menores */}
       <aside className={`
         fixed top-0 left-0 z-[70] h-screen bg-white border-r border-slate-100 flex flex-col
-        transition-all duration-400 cubic-bezier(0.4, 0, 0.2, 1) w-72
+        transition-transform duration-400 cubic-bezier(0.4, 0, 0.2, 1) w-72
         ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo & Info */}
@@ -56,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
              {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
               ) : (
-                <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M12 14l9-5-9-5-9 5 9 5z" />
                     <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
@@ -76,8 +76,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
           </button>
         </div>
 
-        {/* Menu Principal conforme Print do Usuário */}
-        <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
+        {/* Menu Principal */}
+        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem 
             view="DASHBOARD" 
             label="Início" 
@@ -90,12 +90,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
           />
           <NavItem 
             view="NEW_TRAINING" 
-            label="Treinamentos" 
+            label="Atendimentos" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>} 
           />
           <NavItem 
             view="HOURS_MANAGEMENT" 
-            label="Projetos" 
+            label="Gestão de Horas" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>} 
           />
           <NavItem 
@@ -110,14 +110,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
           />
           <NavItem 
             view="CLIENT_LIST" 
-            label="Lista de Projetos" 
+            label="Saldos Residuais" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} 
           />
           
-          {/* Seção Administrativa Ocultável para Staff */}
           {isManager && (
             <div className="pt-8 mt-4 border-t border-slate-50">
-              <div className="px-5 mb-4 flex items-center gap-2">
+              <div className="px-5 mb-3 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Configurações</span>
               </div>
@@ -161,10 +160,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
         <div className="p-6 mt-auto bg-slate-50/50 border-t border-slate-100">
           <button
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-[10px] font-black text-white bg-red-600 hover:bg-red-700 rounded-2xl transition-all shadow-lg shadow-red-100 mb-6 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[10px] font-black text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-lg shadow-red-100 mb-6 active:scale-95"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            LOGOUT DO SISTEMA
+            LOGOUT
           </button>
           
           <div className="flex items-center gap-4 px-1">
@@ -174,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
             <div className="flex flex-col min-w-0">
               <span className="text-sm font-black text-slate-800 leading-none truncate">{user?.name.split(' ')[0]}</span>
               <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1.5 truncate">
-                {user?.role === UserRole.MANAGER ? 'ADMINISTRADOR' : 'TÉCNICO ANALISTA'}
+                {user?.role === UserRole.MANAGER ? 'ADMINISTRADOR' : 'TÉCNICO'}
               </span>
             </div>
           </div>

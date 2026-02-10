@@ -102,8 +102,9 @@ const App: React.FC = () => {
     if (view === 'LOGIN') return <LoginForm onLogin={handleLogin} branding={branding} />;
 
     return (
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center z-40 shadow-sm flex-shrink-0">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+        {/* Header - Visível apenas em telas menores que LG ou quando o usuário não está logado */}
+        <header className="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center z-40 shadow-sm flex-shrink-0 lg:hidden">
           <button 
             onClick={() => setIsSidebarOpen(true)} 
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
@@ -124,8 +125,9 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50 p-4 pb-20">
-          <div className="animate-fadeIn max-w-full">
+        {/* Content Area */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-8 pb-24 lg:pb-8">
+          <div className="animate-fadeIn max-w-5xl mx-auto w-full">
             {view === 'DASHBOARD' && <Dashboard user={currentUser!} clients={filteredData.clients} logs={filteredData.logs} setView={setView} />}
             {view === 'CLIENT_REG' && <CustomerManagement user={currentUser!} onComplete={() => { refreshData(); setView('DASHBOARD'); }} />}
             {view === 'TRAINING_PURCHASE' && <TrainingPurchase user={currentUser!} onComplete={() => refreshData()} />}
@@ -146,30 +148,29 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-full min-h-screen bg-slate-900 flex justify-center items-center overflow-hidden">
-      {/* Container Principal: Proporção 9:16 fixa no Desktop, Full no Mobile */}
-      <div className="w-full h-full md:w-[420px] md:h-[746px] bg-white flex flex-col relative md:shadow-[0_0_80px_rgba(0,0,0,0.6)] md:rounded-[3rem] overflow-hidden transition-all">
-        
-        {notification && (
-          <NotificationToast 
-            message={notification.message}
-            subMessage={notification.subMessage}
-            onClose={() => setNotification(null)}
-          />
-        )}
+    <div className="w-full h-full min-h-screen bg-slate-100 flex overflow-hidden">
+      {notification && (
+        <NotificationToast 
+          message={notification.message}
+          subMessage={notification.subMessage}
+          onClose={() => setNotification(null)}
+        />
+      )}
 
-        {view !== 'LOGIN' && isConfigured && (
-          <Sidebar 
-            user={currentUser} 
-            onLogout={handleLogout} 
-            setView={setView} 
-            currentView={view} 
-            isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)}
-            branding={branding}
-          />
-        )}
-        
+      {view !== 'LOGIN' && isConfigured && (
+        <Sidebar 
+          user={currentUser} 
+          onLogout={handleLogout} 
+          setView={setView} 
+          currentView={view} 
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          branding={branding}
+        />
+      )}
+      
+      {/* Container Principal que se adapta */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${view !== 'LOGIN' && isConfigured ? 'lg:ml-72' : ''}`}>
         {renderContent()}
       </div>
     </div>
