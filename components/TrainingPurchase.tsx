@@ -29,6 +29,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     tipoTreinamento: '',
     solicitante: '',
     duracaoHoras: 0,
+    residualHoursAdded: 0,
     dataInicio: new Date().toISOString().split('T')[0],
     valorImplantacao: 0,
     comissaoPercent: 0,
@@ -84,7 +85,32 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   }, [formData.customerId, customers]);
 
   const handleCustomerChange = (cid: string) => {
-    setFormData(prev => ({ ...prev, customerId: cid, solicitante: '' }));
+    // 1. Identifica se o cliente já tem algum projeto PENDENTE
+    const hasPending = allClients.some(c => c.customerId === cid && c.status === 'pending' && c.id !== editingId);
+    
+    let residualHours = 0;
+    if (!hasPending) {
+      // Busca o saldo residual do projeto concluído mais recente
+      const completedProjects = allClients
+        .filter(c => c.customerId === cid && c.status === 'completed' && (c.residualHoursAdded || 0) > 0)
+        .sort((a, b) => {
+          const dateA = a.dataFim ? new Date(a.dataFim).getTime() : 0;
+          const dateB = b.dataFim ? new Date(b.dataFim).getTime() : 0;
+          return dateB - dateA;
+        });
+      
+      if (completedProjects.length > 0) {
+        residualHours = completedProjects[0].residualHoursAdded || 0;
+      }
+    }
+
+    setFormData(prev => ({ 
+      ...prev, 
+      customerId: cid, 
+      solicitante: '',
+      residualHoursAdded: residualHours,
+      duracaoHoras: residualHours // Inicia com o saldo residual
+    }));
   };
 
   const toggleModule = (moduleName: string) => {
@@ -205,6 +231,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         tipoTreinamento: formData.tipoTreinamento,
         solicitante: formData.solicitante,
         duracaoHoras: Number(formData.duracaoHoras),
+        residualHoursAdded: Number(formData.residualHoursAdded),
         dataInicio: formData.dataInicio,
         valorImplantacao: Number(formData.valorImplantacao),
         comissaoPercent: Number(formData.comissaoPercent),
@@ -239,6 +266,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       tipoTreinamento: client.tipoTreinamento,
       solicitante: client.solicitante || '',
       duracaoHoras: client.duracaoHoras,
+      residualHoursAdded: client.residualHoursAdded || 0,
       dataInicio: client.dataInicio,
       valorImplantacao: client.valorImplantacao,
       comissaoPercent: client.comissaoPercent,
@@ -257,6 +285,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       tipoTreinamento: availableTypes[0]?.name || '',
       solicitante: '',
       duracaoHoras: 0,
+      residualHoursAdded: 0,
       dataInicio: new Date().toISOString().split('T')[0],
       valorImplantacao: 0,
       comissaoPercent: 0,
@@ -396,6 +425,11 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                 <div>
                   <label className="block text-[8px] font-black text-emerald-600/60 uppercase mb-1.5 ml-1">Carga Horária (H)</label>
                   <input type="number" step="0.5" className="w-full px-4 py-3 rounded-xl border border-white font-bold text-emerald-700 bg-white shadow-sm text-xs" value={formData.duracaoHoras} onChange={e => setFormData({...formData, duracaoHoras: Number(e.target.value)})} required />
+                  {formData.residualHoursAdded > 0 && (
+                    <p className="text-[7px] text-emerald-600 font-black uppercase mt-1 ml-1 animate-pulse">
+                      + {formData.residualHoursAdded}h de saldo residual incluído
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-emerald-600/60 uppercase mb-1.5 ml-1">Data Início</label>

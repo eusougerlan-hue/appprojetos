@@ -25,19 +25,25 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refresh
   const filteredClients = useMemo(() => {
     // 1. Identifica quais IDs de clientes (Customer) possuem projetos pendentes (vendas novas/ativas)
     const customerIdsWithPending = new Set(
-      clients.filter(c => c.status === 'pending').map(c => c.customerId)
+      clients.filter(c => c.status === 'pending' && c.customerId).map(c => c.customerId)
     );
 
     // 2. Mapa para agrupar e manter apenas o projeto concluído MAIS RECENTE por cliente
     const latestResidualsByCustomer = new Map<string, Client>();
+    const residualsWithoutCustomer: Client[] = [];
 
     clients.forEach(c => {
       // Filtra apenas finalizados com saldo positivo E que NÃO tenham uma nova compra pendente
       if (
         c.status === 'completed' && 
         (c.residualHoursAdded || 0) > 0 &&
-        !customerIdsWithPending.has(c.customerId)
+        (!c.customerId || !customerIdsWithPending.has(c.customerId))
       ) {
+        if (!c.customerId) {
+          residualsWithoutCustomer.push(c);
+          return;
+        }
+
         const existing = latestResidualsByCustomer.get(c.customerId);
         
         if (!existing) {
@@ -53,7 +59,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refresh
       }
     });
 
-    const baseList = Array.from(latestResidualsByCustomer.values());
+    const baseList = [...Array.from(latestResidualsByCustomer.values()), ...residualsWithoutCustomer];
     
     if (!searchTerm.trim()) return baseList;
     return baseList.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
