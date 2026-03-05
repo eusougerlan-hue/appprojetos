@@ -1,14 +1,16 @@
 
 import React from 'react';
 import { Client, ViewState, TrainingLog } from '../types';
+import { updateClientComment } from '../storage';
 
 interface PendingTrainingsProps {
   clients: Client[];
   logs: TrainingLog[];
   setView: (view: ViewState) => void;
+  refreshData: () => void;
 }
 
-const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setView }) => {
+const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setView, refreshData }) => {
   const pending = clients.filter(c => c.status === 'pending');
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -31,6 +33,15 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
     return diffDays > 0 ? diffDays : 0;
   };
 
+  const handleUpdateComment = async (clientId: string, comentario: string) => {
+    try {
+      await updateClientComment(clientId, comentario);
+      refreshData();
+    } catch (error) {
+      console.error('Erro ao atualizar comentário:', error);
+    }
+  };
+
   return (
     <div className="animate-fadeIn">
       <div className="mb-6 px-2">
@@ -51,8 +62,20 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
         ) : (
           pending.map((client) => {
             const technician = getResponsibleTechnician(client);
-            const hasStarted = logs.some(l => l.clientId === client.id);
-            const daysPending = calculateDaysPending(client.dataInicio);
+            const clientLogs = logs.filter(l => l.clientId === client.id);
+            const hasStarted = clientLogs.length > 0;
+            
+            // Get the first training log date
+            const firstLog = [...clientLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+            const startDate = firstLog ? firstLog.date : client.dataInicio;
+            const formattedStartDate = new Date(startDate).toLocaleDateString('pt-BR');
+            
+            const daysPending = calculateDaysPending(startDate);
+            const isDelayed = daysPending >= 30;
+
+            const horasContratadas = client.duracaoHoras;
+            const horasUtilizadas = clientLogs.reduce((acc, log) => acc + (log.horasCalculadas || 0), 0);
+            const saldoHoras = horasContratadas - horasUtilizadas;
 
             return (
               <div key={client.id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all active:scale-[0.98]">
@@ -77,10 +100,40 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
                   </div>
                   
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`text-[14px] font-black ${daysPending > 15 ? 'text-red-500' : daysPending > 7 ? 'text-orange-500' : 'text-blue-400'}`}>
+                    <span className={`text-[14px] font-black ${isDelayed ? 'text-red-600' : daysPending > 15 ? 'text-orange-500' : 'text-blue-400'}`}>
                       {daysPending}
                     </span>
                     <span className="text-[7px] text-slate-400 font-black uppercase tracking-tighter">dias pend.</span>
+                  </div>
+                </div>
+
+                {/* New Columns Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                  <div className="flex flex-col">
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Início do Projeto</span>
+                    <span className="text-[10px] font-black text-slate-700">{hasStarted ? formattedStartDate : 'Não iniciado'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Contratadas</span>
+                    <span className="text-[10px] font-black text-slate-700">{horasContratadas.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Utilizadas</span>
+                    <span className="text-[10px] font-black text-blue-600">{horasUtilizadas.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Saldo</span>
+                    <span className={`text-[10px] font-black ${saldoHoras < 0 ? 'text-red-500' : 'text-green-600'}`}>{saldoHoras.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex flex-col col-span-2 md:col-span-1">
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Comentário</span>
+                    <input 
+                      type="text"
+                      className="text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                      placeholder="Adicionar..."
+                      defaultValue={client.comentario || ''}
+                      onBlur={(e) => handleUpdateComment(client.id, e.target.value)}
+                    />
                   </div>
                 </div>
 

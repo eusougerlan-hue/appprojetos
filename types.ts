@@ -65,6 +65,7 @@ export interface Client {
   responsavelTecnico: string;
   commissionPaid?: boolean;
   observacao?: string; // NOVO: Campo para observações do contrato
+  comentario?: string; // NOVO: Comentário na tela de pendentes
 }
 
 export interface IntegrationSettings {

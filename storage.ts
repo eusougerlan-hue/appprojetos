@@ -94,7 +94,8 @@ const mapClientFromDB = (db: any): Client => ({
   status: db.status,
   responsavelTecnico: db.responsavel_tecnico || '',
   commissionPaid: db.commission_paid || false,
-  observacao: brToNewline(db.observacao || '')
+  observacao: brToNewline(db.observacao || ''),
+  comentario: brToNewline(db.comentario || '')
 });
 
 const mapClientToDB = (client: Client) => {
@@ -114,7 +115,8 @@ const mapClientToDB = (client: Client) => {
     status: client.status,
     responsavel_tecnico: client.responsavelTecnico,
     commission_paid: client.commissionPaid || false,
-    observacao: newlineToBr(client.observacao || '')
+    observacao: newlineToBr(client.observacao || ''),
+    comentario: newlineToBr(client.comentario || '')
   };
   return data;
 };
@@ -257,6 +259,12 @@ export const updateClientStatus = async (clientId: string, status: 'pending' | '
 
 export const updateCommissionStatus = async (clientId: string, paid: boolean) => {
   const { error } = await supabase.from('clients').update({ commission_paid: paid }).eq('id', clientId);
+  if (error) throw error;
+  return true;
+};
+
+export const updateClientComment = async (clientId: string, comentario: string) => {
+  const { error } = await supabase.from('clients').update({ comentario: newlineToBr(comentario) }).eq('id', clientId);
   if (error) throw error;
   return true;
 };

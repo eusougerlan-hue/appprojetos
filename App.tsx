@@ -133,7 +133,7 @@ const App: React.FC = () => {
             {view === 'TRAINING_PURCHASE' && <TrainingPurchase user={currentUser!} onComplete={() => refreshData()} />}
             {view === 'EMPLOYEE_REG' && <EmployeeRegistration onComplete={() => { refreshData(); setView('DASHBOARD'); }} />}
             {view === 'NEW_TRAINING' && <TrainingForm clients={filteredData.clients} logs={filteredData.logs} user={currentUser!} onComplete={() => refreshData()} />}
-            {view === 'PENDING_LIST' && <PendingTrainings clients={filteredData.clients} logs={filteredData.logs} setView={setView} />}
+            {view === 'PENDING_LIST' && <PendingTrainings clients={filteredData.clients} logs={filteredData.logs} setView={setView} refreshData={refreshData} />}
             {view === 'CLIENT_LIST' && <ClientList clients={filteredData.clients} logs={filteredData.logs} setView={setView} onEditClient={() => {}} refreshData={refreshData} />}
             {view === 'HOURS_MANAGEMENT' && <HoursManagement clients={filteredData.clients} logs={filteredData.logs} user={currentUser!} refreshData={refreshData} />}
             {view === 'MODULE_MANAGEMENT' && <ModuleManagement onComplete={() => setView('DASHBOARD')} />}
