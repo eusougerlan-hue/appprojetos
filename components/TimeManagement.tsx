@@ -52,16 +52,10 @@ const TimeManagement: React.FC<TimeManagementProps> = ({ clients, logs }) => {
     }
   };
 
-  const filteredClients = useMemo(() => {
-    return clients.filter(c => {
-      if (c.status !== 'pending') return false;
-      const clientStart = c.dataInicio;
-      return clientStart >= startDate && clientStart <= endDate;
-    });
-  }, [clients, startDate, endDate]);
-
   const tableData = useMemo(() => {
-    return filteredClients.map(client => {
+    const pendingClients = clients.filter(c => c.status === 'pending');
+    
+    const mappedClients = pendingClients.map(client => {
       const clientLogs = logs.filter(l => l.clientId === client.id);
       
       const firstLog = [...clientLogs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
@@ -79,7 +73,11 @@ const TimeManagement: React.FC<TimeManagementProps> = ({ clients, logs }) => {
         saldo
       };
     });
-  }, [filteredClients, logs]);
+
+    return mappedClients
+      .filter(client => client.dataInicioReal >= startDate && client.dataInicioReal <= endDate)
+      .sort((a, b) => new Date(a.dataInicioReal).getTime() - new Date(b.dataInicioReal).getTime());
+  }, [clients, logs, startDate, endDate]);
 
   const horasOcupadas = tableData.reduce((acc, curr) => acc + curr.saldo, 0);
   const totalHoras = dias * horasPorDia;
