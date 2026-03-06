@@ -51,6 +51,56 @@ const App: React.FC = () => {
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  useEffect(() => {
+    const manifest = {
+      name: branding.appName || 'TrainMaster Pro',
+      short_name: branding.appSubtitle || 'TrainMaster',
+      description: 'Gestão Avançada de Treinamentos de Software',
+      start_url: './',
+      display: 'standalone',
+      background_color: '#f8fafc',
+      theme_color: '#2563eb',
+      orientation: 'portrait',
+      icons: [
+        {
+          src: branding.logoUrl || 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any maskable'
+        },
+        {
+          src: branding.logoUrl || 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
+          sizes: '192x192',
+          type: 'image/png'
+        }
+      ]
+    };
+
+    const stringManifest = JSON.stringify(manifest);
+    const blob = new Blob([stringManifest], { type: 'application/json' });
+    const manifestURL = URL.createObjectURL(blob);
+
+    let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'manifest';
+      document.head.appendChild(link);
+    }
+    link.href = manifestURL;
+
+    return () => URL.revokeObjectURL(manifestURL);
+  }, [branding]);
 
   const refreshData = useCallback(async () => {
     if (!isConfigured) return;
@@ -114,6 +164,21 @@ const App: React.FC = () => {
           </button>
           
           <div className="flex items-center gap-3">
+            {deferredPrompt && (
+              <button
+                onClick={() => {
+                  deferredPrompt.prompt();
+                  deferredPrompt.userChoice.then((choiceResult: any) => {
+                    if (choiceResult.outcome === 'accepted') {
+                      setDeferredPrompt(null);
+                    }
+                  });
+                }}
+                className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+              >
+                Instalar App
+              </button>
+            )}
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-black text-gray-800 leading-none">{currentUser?.name.split(' ')[0]}</span>
               <span className="text-[8px] text-blue-600 font-black uppercase tracking-widest mt-1">
@@ -168,6 +233,8 @@ const App: React.FC = () => {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           branding={branding}
+          deferredPrompt={deferredPrompt}
+          setDeferredPrompt={setDeferredPrompt}
         />
       )}
       

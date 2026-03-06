@@ -10,9 +10,11 @@ interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   branding: BrandingConfig;
+  deferredPrompt?: any;
+  setDeferredPrompt?: (prompt: any) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView, isOpen, onClose, branding }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView, isOpen, onClose, branding, deferredPrompt, setDeferredPrompt }) => {
   const isManager = user?.role === UserRole.MANAGER;
 
   const NavItem = ({ view, label, icon }: { view: ViewState, label: string, icon: React.ReactNode }) => (
@@ -163,6 +165,22 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, setView, currentView,
 
         {/* User Footer */}
         <div className="p-6 mt-auto bg-slate-50/50 border-t border-slate-100">
+          {deferredPrompt && (
+            <button
+              onClick={() => {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult: any) => {
+                  if (choiceResult.outcome === 'accepted') {
+                    if (setDeferredPrompt) setDeferredPrompt(null);
+                  }
+                });
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[10px] font-black text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-lg shadow-blue-100 mb-3 active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              INSTALAR APP
+            </button>
+          )}
           <button
             onClick={onLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[10px] font-black text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-lg shadow-red-100 mb-6 active:scale-95"
