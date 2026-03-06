@@ -34,10 +34,12 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
         const profitPercent = client.valorImplantacao > 0 ? (profitValue / client.valorImplantacao) * 100 : 0;
 
         let daysToFinish = 0;
+        let firstLogDate: Date | null = null;
         if (clientLogs.length > 0) {
           const dates = clientLogs.map(l => new Date(l.date).getTime());
           const minDate = Math.min(...dates);
           const maxDate = Math.max(...dates);
+          firstLogDate = new Date(minDate);
           daysToFinish = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1);
         }
 
@@ -48,12 +50,16 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
           commissionValue,
           profitValue,
           profitPercent,
-          daysToFinish
+          daysToFinish,
+          firstLogDate
         };
       })
       .filter(report => {
         const matchesStatus = filter === 'ALL' || (filter === 'PENDING' ? report.status === 'pending' : report.status === 'completed');
-        const projectDate = new Date(report.dataInicio);
+        
+        if (!report.firstLogDate) return false;
+
+        const projectDate = new Date(report.firstLogDate);
         const start = startDate ? new Date(startDate) : null;
         const end = endDate ? new Date(endDate) : null;
         if (start) start.setHours(0, 0, 0, 0);
@@ -61,6 +67,11 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
         projectDate.setHours(12, 0, 0, 0);
         const matchesDate = (!start || projectDate >= start) && (!end || projectDate <= end);
         return matchesStatus && matchesDate;
+      })
+      .sort((a, b) => {
+        const dateA = a.firstLogDate ? new Date(a.firstLogDate).getTime() : 0;
+        const dateB = b.firstLogDate ? new Date(b.firstLogDate).getTime() : 0;
+        return dateB - dateA;
       });
   }, [clients, logs, filter, startDate, endDate]);
 
@@ -157,14 +168,13 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
                     <div className="grid grid-cols-4 gap-4 items-start text-center">
                       <div className="text-left">
                         <p className="text-xs font-black text-slate-800 leading-tight mb-1">{report.razãoSocial}</p>
-                        <p className="text-[9px] text-slate-400 font-bold mb-3">{new Date(report.dataInicio).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-[9px] text-slate-400 font-bold mb-3">{report.firstLogDate ? new Date(report.firstLogDate).toLocaleDateString('pt-BR') : new Date(report.dataInicio).toLocaleDateString('pt-BR')}</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {report.modulos.slice(0, 4).map(m => (
+                          {report.modulos.map(m => (
                             <span key={m} className="text-[7px] bg-blue-50/50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100/50 font-black uppercase tracking-tighter">
                               {m}
                             </span>
                           ))}
-                          {report.modulos.length > 4 && <span className="text-[7px] text-slate-300 font-black">+{report.modulos.length - 4}</span>}
                         </div>
                       </div>
 

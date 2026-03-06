@@ -192,14 +192,11 @@ const TimeManagement: React.FC<TimeManagementProps> = ({ clients, logs }) => {
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-1">
-                        {client.modulos.slice(0, 2).map(m => (
+                        {client.modulos.map(m => (
                           <span key={m} className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-black tracking-widest">
                             {m}
                           </span>
                         ))}
-                        {client.modulos.length > 2 && (
-                          <span className="text-[8px] text-slate-400 font-black p-0.5">+{client.modulos.length - 2}</span>
-                        )}
                       </div>
                     </td>
                     <td className="p-4 text-xs font-bold text-slate-600 text-right whitespace-nowrap">

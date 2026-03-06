@@ -88,14 +88,11 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
                       <span className="text-[8px] bg-orange-50 text-orange-600 px-2 py-1 rounded-lg border border-orange-100 font-black uppercase tracking-widest">
                         {client.tipoTreinamento}
                       </span>
-                      {client.modulos.slice(0, 2).map(m => (
+                      {client.modulos.map(m => (
                         <span key={m} className="text-[8px] bg-slate-50 text-slate-400 px-2 py-1 rounded-lg border border-slate-100 font-black uppercase tracking-widest">
                           {m}
                         </span>
                       ))}
-                      {client.modulos.length > 2 && (
-                        <span className="text-[8px] text-slate-300 font-black p-1">+{client.modulos.length - 2}</span>
-                      )}
                     </div>
                   </div>
                   
