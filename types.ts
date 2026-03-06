@@ -103,6 +103,12 @@ export interface TrainingLog {
   horasCalculadas: number;
 }
 
+export interface TimeManagementConfig {
+  id: string; // e.g., "2026-03"
+  dias: number;
+  horasPorDia: number;
+}
+
 export type ViewState = 
   | 'LOGIN' 
   | 'DASHBOARD' 
@@ -116,5 +122,6 @@ export type ViewState =
   | 'MODULE_MANAGEMENT'
   | 'TRAINING_TYPE_MGMT'
   | 'PROFITABILITY'
+  | 'TIME_MANAGEMENT'
   | 'COMMISSION_PAYMENT'
   | 'INTEGRATIONS';

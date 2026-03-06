@@ -16,6 +16,7 @@ import HoursManagement from './components/HoursManagement';
 import ModuleManagement from './components/ModuleManagement';
 import TrainingTypeManagement from './components/TrainingTypeManagement';
 import ProfitabilityReport from './components/ProfitabilityReport';
+import TimeManagement from './components/TimeManagement';
 import CommissionPayment from './components/CommissionPayment';
 import Integrations from './components/Integrations';
 import SetupView from './components/SetupView';
@@ -139,6 +140,7 @@ const App: React.FC = () => {
             {view === 'MODULE_MANAGEMENT' && <ModuleManagement onComplete={() => setView('DASHBOARD')} />}
             {view === 'TRAINING_TYPE_MGMT' && <TrainingTypeManagement onComplete={() => setView('DASHBOARD')} />}
             {view === 'PROFITABILITY' && <ProfitabilityReport clients={clients} logs={logs} />}
+            {view === 'TIME_MANAGEMENT' && <TimeManagement clients={clients} logs={logs} />}
             {view === 'COMMISSION_PAYMENT' && <CommissionPayment clients={clients} refreshData={refreshData} />}
             {view === 'INTEGRATIONS' && <Integrations onBrandingChange={refreshData} />}
           </div>

@@ -1,5 +1,5 @@
 
-import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity, BrandingConfig, Contact } from './types';
+import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity, BrandingConfig, Contact, TimeManagementConfig } from './types';
 import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
 /**
@@ -339,6 +339,30 @@ export const updateTrainingType = async (type: TrainingTypeEntity) => {
 
 export const deleteTrainingType = async (id: string) => {
   const { error } = await supabase.from('training_types').delete().eq('id', id);
+  if (error) throw error;
+};
+
+// --- TIME MANAGEMENT ---
+export const getStoredTimeConfig = async (monthYear: string): Promise<TimeManagementConfig | null> => {
+  try {
+    const { data, error } = await supabase.from('time_management_configs').select('*').eq('id', monthYear).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data) {
+      return { id: data.id, dias: Number(data.dias || 0), horasPorDia: Number(data.horas_por_dia || 0) };
+    }
+  } catch (err) {
+    console.error("Erro ao buscar time config:", err);
+  }
+  return null;
+};
+
+export const saveTimeConfig = async (config: TimeManagementConfig) => {
+  const { error } = await supabase.from('time_management_configs').upsert({
+    id: config.id,
+    dias: config.dias,
+    horas_por_dia: config.horasPorDia,
+    updated_at: new Date().toISOString()
+  });
   if (error) throw error;
 };
 
