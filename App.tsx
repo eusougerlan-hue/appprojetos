@@ -42,10 +42,18 @@ const App: React.FC = () => {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
-  const [branding, setBranding] = useState<BrandingConfig>({
-    appName: 'TrainMaster',
-    appSubtitle: 'SISTEMA PRO',
-    logoUrl: ''
+  const [branding, setBranding] = useState<BrandingConfig>(() => {
+    const saved = localStorage.getItem('TM_BRANDING_DATA');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      appName: 'TrainMaster',
+      appSubtitle: 'SISTEMA PRO',
+      logoUrl: ''
+    };
   });
   
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
@@ -61,46 +69,6 @@ const App: React.FC = () => {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
-
-  useEffect(() => {
-    const manifest = {
-      name: branding.appName || 'TrainMaster Pro',
-      short_name: branding.appSubtitle || 'TrainMaster',
-      description: 'Gestão Avançada de Treinamentos de Software',
-      start_url: './',
-      display: 'standalone',
-      background_color: '#f8fafc',
-      theme_color: '#2563eb',
-      orientation: 'portrait',
-      icons: [
-        {
-          src: branding.logoUrl || 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any maskable'
-        },
-        {
-          src: branding.logoUrl || 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
-          sizes: '192x192',
-          type: 'image/png'
-        }
-      ]
-    };
-
-    const stringManifest = JSON.stringify(manifest);
-    const blob = new Blob([stringManifest], { type: 'application/json' });
-    const manifestURL = URL.createObjectURL(blob);
-
-    let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'manifest';
-      document.head.appendChild(link);
-    }
-    link.href = manifestURL;
-
-    return () => URL.revokeObjectURL(manifestURL);
-  }, [branding]);
 
   const refreshData = useCallback(async () => {
     if (!isConfigured) return;

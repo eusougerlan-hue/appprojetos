@@ -17,18 +17,18 @@ export default defineConfig({
         background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: './',
+        start_url: '/',
         icons: [
           {
-            src: 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
+            src: '/icon.svg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           },
           {
-            src: 'https://cdn-icons-png.flaticon.com/512/3462/3462151.png',
+            src: '/icon.svg',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/svg+xml'
           }
         ],
         shortcuts: [
@@ -38,6 +38,9 @@ export default defineConfig({
             icons: [{ src: 'https://cdn-icons-png.flaticon.com/192/3119/3119338.png', sizes: '192x192' }]
           }
         ]
+      },
+      devOptions: {
+        enabled: true
       }
     })
   ],
