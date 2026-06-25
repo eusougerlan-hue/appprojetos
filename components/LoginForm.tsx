@@ -32,8 +32,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, branding }) => {
       } else {
         setError('Credenciais inválidas.');
       }
-    } catch (err) {
-      setError('Erro de conexão.');
+    } catch (err: any) {
+      setError(err.message ? `Erro de conexão: ${err.message}` : 'Erro de conexão.');
     } finally {
       setLoading(false);
     }

@@ -24,6 +24,8 @@
     "supabase.ts",
     "types.ts",
     "storage.ts",
+    "server.ts",
+    "api/index.ts",
     "components"
   ],
   "exclude": [
