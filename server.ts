@@ -630,6 +630,9 @@ app.post("/api/cloud-config", async (req, res) => {
   }
 });
 
+// Export app for serverless deployment (e.g., Vercel)
+export default app;
+
 // Vite Middleware & SPA Fallback setup
 async function startServer() {
   await initDB();
@@ -653,4 +656,12 @@ async function startServer() {
   });
 }
 
-startServer();
+// Start local server if not on Vercel
+if (!process.env.VERCEL) {
+  startServer();
+} else {
+  // On Vercel, run database initialization on module load
+  initDB().catch(err => {
+    console.error("Database initialization failed under Vercel serverless:", err);
+  });
+}
