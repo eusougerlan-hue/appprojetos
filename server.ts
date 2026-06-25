@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import pg from "pg";
-import { createServer as createViteServer } from "vite";
 import crypto from "crypto";
 
 const app = express();
@@ -638,7 +637,8 @@ async function startServer() {
   await initDB();
 
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    const { createServer } = await import("vite");
+    const vite = await createServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
