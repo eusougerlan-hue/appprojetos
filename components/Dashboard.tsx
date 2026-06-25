@@ -55,6 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
                logDate.getFullYear() === currentYear;
       }).length;
       return {
+        id: tech.id,
         name: tech.name,
         pending: techPending,
         completed: 0, // Simplified for this view
@@ -129,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {techProductivity.map((tech) => (
-                  <tr key={tech.name} className="hover:bg-blue-50/20 transition-colors">
+                  <tr key={tech.id} className="hover:bg-blue-50/20 transition-colors">
                     <td className="px-4 md:px-6 py-2 md:py-3">
                       <div className="flex items-center gap-2 md:gap-3">
                         <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-[8px] md:text-[10px]">

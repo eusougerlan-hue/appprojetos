@@ -455,9 +455,9 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
           <div>
             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Participantes</label>
             <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 min-h-[60px]">
-              {availableContacts.map(contact => (
+              {availableContacts.map((contact, index) => (
                 <button 
-                  key={contact.name} 
+                  key={`${contact.name}-${index}`} 
                   type="button" 
                   onClick={() => toggleContactSelection(contact)} 
                   className={`px-3 py-1.5 rounded-xl text-[8px] font-black border transition-all ${formData.receivedBy.some(c => c.name === contact.name) ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}

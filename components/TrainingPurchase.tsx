@@ -134,8 +134,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
     // BLOCO DE GERAÇÃO AUTOMÁTICA DE PROTOCOLO (Somente para novas vendas)
     if (!editingId) {
-      if (!settings.webhookUrl || !settings.apiKey) {
-        return alert('CONFIGURAÇÃO PENDENTE: Vá em Integrações Cloud e configure o Webhook e a API Key.');
+      if (!settings.webhookUrl) {
+        return alert('CONFIGURAÇÃO PENDENTE: Vá em Integrações Cloud e configure o Webhook.');
       }
       
       setGeneratingProtocol(true);

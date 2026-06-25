@@ -149,13 +149,16 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
       {/* Project Table/List Area - Wrapped in overflow-x-auto to keep columns side-by-side */}
       <div className="bg-white/50 rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
-          <div className="min-w-[700px]">
+          <div className="min-w-[1000px]">
             {/* Table Header */}
-            <div className="px-6 py-5 bg-slate-50/50 border-b border-slate-100 grid grid-cols-4 gap-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">
+            <div className="px-6 py-5 bg-slate-50/50 border-b border-slate-100 grid grid-cols-[2fr_1fr_1fr_1.2fr_1fr_1fr_1.2fr] gap-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] text-center">
               <span className="text-left">Razão Social / Módulos</span>
               <span>Valor Contrato</span>
               <span>Horas / Dias</span>
-              <span className="text-right pr-4">Composição Carga</span>
+              <span>Composição Carga</span>
+              <span>Transporte</span>
+              <span>Comissão</span>
+              <span className="text-right pr-4">Resultado</span>
             </div>
 
             {/* Table Body */}
@@ -165,7 +168,7 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
               ) : (
                 reports.map((report) => (
                   <div key={report.id} className="p-6 hover:bg-blue-50/10 transition-colors">
-                    <div className="grid grid-cols-4 gap-4 items-start text-center">
+                    <div className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1fr_1fr_1.2fr] gap-4 items-center text-center">
                       <div className="text-left">
                         <p className="text-xs font-black text-slate-800 leading-tight mb-1">{report.razãoSocial}</p>
                         <p className="text-[9px] text-slate-400 font-bold mb-3">{report.firstLogDate ? new Date(report.firstLogDate).toLocaleDateString('pt-BR') : new Date(report.dataInicio).toLocaleDateString('pt-BR')}</p>
@@ -178,45 +181,42 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ clients, logs
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center pt-1">
+                      <div className="flex flex-col items-center justify-center">
                         <p className="text-xs font-black text-slate-700">R$ {report.valorImplantacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                        <span className="text-[8px] text-slate-300 font-bold uppercase mt-1.5 tracking-widest">{report.tipoTreinamento}</span>
+                        <span className="text-[8px] text-slate-300 font-bold uppercase mt-1 tracking-widest">{report.tipoTreinamento}</span>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center pt-1">
+                      <div className="flex flex-col items-center justify-center">
                         <span className="text-xs font-black text-blue-600">{report.usedHours.toFixed(1)}h</span>
-                        <span className="text-[9px] text-slate-400 font-bold uppercase mt-1.5 tracking-widest">EM {report.daysToFinish} DIAS</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">EM {report.daysToFinish} DIAS</span>
                       </div>
 
-                      <div className="flex flex-col items-end justify-center pt-1 pr-4">
+                      <div className="flex flex-col items-center justify-center">
                         <span className="text-xs font-black text-slate-600">{(report.duracaoHoras - (report.residualHoursAdded || 0)).toFixed(1)}h Novas</span>
                         {report.residualHoursAdded && report.residualHoursAdded > 0 ? (
-                           <div className="bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[9px] tracking-tighter mt-1.5 shadow-md">
+                           <div className="bg-blue-600 text-white px-3 py-1.5 rounded-xl font-black text-[9px] tracking-tighter mt-1 shadow-md">
                              + {report.residualHoursAdded.toFixed(1)}h Residuais
                            </div>
                         ) : (
-                           <span className="text-[8px] text-slate-300 font-bold mt-1.5 uppercase tracking-widest">Saldo Limpo</span>
+                           <span className="text-[8px] text-slate-300 font-bold mt-1 uppercase tracking-widest">Saldo Limpo</span>
                         )}
                       </div>
-                    </div>
 
-                    {/* Result Footer per item */}
-                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-50">
-                      <div className="flex gap-8">
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-slate-300 uppercase leading-none tracking-widest mb-1.5">Transporte</span>
-                          <span className="text-[10px] font-black text-purple-600">R$ {report.totalTransport.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-slate-300 uppercase leading-none tracking-widest mb-1.5">Comissão</span>
-                          <span className="text-[10px] font-black text-orange-600">R$ {report.commissionValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        </div>
+                      <div className="flex flex-col items-center justify-center">
+                        <p className="text-xs font-black text-purple-600">R$ {report.totalTransport.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <span className="text-[8px] text-slate-300 font-bold uppercase mt-1 tracking-widest">Transporte</span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[8px] font-black text-slate-300 uppercase leading-none tracking-widest mb-1.5">Resultado</span>
+
+                      <div className="flex flex-col items-center justify-center">
+                        <p className="text-xs font-black text-orange-600">R$ {report.commissionValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <span className="text-[8px] text-slate-300 font-bold uppercase mt-1 tracking-widest">Comissão</span>
+                      </div>
+
+                      <div className="flex flex-col items-end justify-center pr-4">
                         <p className={`text-sm font-black ${report.profitValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           R$ {report.profitValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
+                        <span className="text-[8px] text-slate-300 font-bold uppercase mt-1 tracking-widest">Resultado</span>
                       </div>
                     </div>
                   </div>

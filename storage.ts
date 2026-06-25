@@ -1,13 +1,6 @@
-
 import { User, Client, TrainingLog, UserRole, SystemModule, Customer, IntegrationSettings, TrainingTypeEntity, BrandingConfig, Contact, TimeManagementConfig } from './types';
-import { supabase, getSupabase, resetSupabaseClient } from './supabase';
 
-/**
- * Chaves para o LocalStorage (Branding Cache e Config Cloud)
- */
 const BRANDING_LOCAL_KEY = 'TM_BRANDING_DATA';
-const SUPABASE_URL_KEY = 'SUPABASE_URL';
-const SUPABASE_KEY_KEY = 'SUPABASE_ANON_KEY';
 
 // Utilitário global para comparação de strings (Nomes de técnicos, etc)
 export const normalizeString = (str: string | null | undefined): string => 
@@ -51,6 +44,7 @@ const mapUserFromDB = (db: any): User => ({
 });
 
 const mapUserToDB = (user: User) => ({
+  id: user.id,
   name: user.name,
   phone: user.phone,
   email: user.email,
@@ -70,6 +64,7 @@ const mapCustomerFromDB = (db: any): Customer => ({
 });
 
 const mapCustomerToDB = (customer: Customer) => ({
+  id: customer.id,
   razao_social: customer.razãoSocial,
   cnpj: customer.cnpj,
   ref_movidesk: customer.refMovidesk || '',
@@ -82,7 +77,7 @@ const mapClientFromDB = (db: any): Client => ({
   customerId: db.customer_id,
   razãoSocial: db.razao_social,
   protocolo: db.protocolo,
-  modulos: db.modulos || [],
+  modulos: Array.isArray(db.modulos) ? db.modulos : parseContacts(db.modulos).map((x: any) => String(x)),
   tipoTreinamento: db.tipo_treinamento || '',
   solicitante: db.solicitante || '',
   duracaoHoras: Number(db.duracao_horas || 0),
@@ -99,7 +94,8 @@ const mapClientFromDB = (db: any): Client => ({
 });
 
 const mapClientToDB = (client: Client) => {
-  const data: any = {
+  return {
+    id: client.id,
     customer_id: client.customerId,
     razao_social: client.razãoSocial,
     protocolo: client.protocolo,
@@ -118,7 +114,6 @@ const mapClientToDB = (client: Client) => {
     observacao: newlineToBr(client.observacao || ''),
     comentario: newlineToBr(client.comentario || '')
   };
-  return data;
 };
 
 const mapLogFromDB = (db: any): TrainingLog => ({
@@ -146,6 +141,7 @@ const mapLogFromDB = (db: any): TrainingLog => ({
 });
 
 const mapLogToDB = (log: TrainingLog) => ({
+  id: log.id,
   client_id: log.clientId,
   numero_protocolo: log.numeroProtocolo,
   employee_id: log.employeeId,
@@ -167,186 +163,224 @@ const mapLogToDB = (log: TrainingLog) => ({
   horas_calculadas: log.horasCalculadas
 });
 
+// Generic API helpers
+const fetchJSON = async (url: string, options?: RequestInit) => {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers || {})
+    }
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
 // --- USERS ---
 export const getStoredUsers = async (): Promise<User[]> => {
-  const { data, error } = await supabase.from('users').select('*').order('name');
-  if (error) throw error;
+  const data = await fetchJSON("/api/users");
   return (data || []).map(mapUserFromDB);
 };
 
 export const saveUser = async (user: User) => {
   const data = mapUserToDB(user);
-  const { error } = await supabase.from('users').insert([data]);
-  if (error) throw error;
+  await fetchJSON("/api/users", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
 };
 
 export const updateUser = async (user: User) => {
   const data = mapUserToDB(user);
-  const { error } = await supabase.from('users').update(data).eq('id', user.id);
-  if (error) throw error;
+  await fetchJSON(`/api/users/${user.id}`, {
+    method: "PUT",
+    body: JSON.stringify(data)
+  });
   return true;
 };
 
 export const deleteUser = async (id: string) => {
-  const client = getSupabase();
-  const { error } = await client.from('users').delete().eq('id', id);
-  if (error) throw error;
+  await fetchJSON(`/api/users/${id}`, {
+    method: "DELETE"
+  });
   return true;
 };
 
 // --- CUSTOMERS ---
 export const getStoredCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase.from('customers').select('*').order('razao_social');
-  if (error) throw error;
+  const data = await fetchJSON("/api/customers");
   return (data || []).map(mapCustomerFromDB);
 };
 
 export const saveCustomer = async (customer: Customer) => {
   const payload = mapCustomerToDB(customer);
-  const { error } = await supabase.from('customers').insert([payload]);
-  if (error) throw error;
+  await fetchJSON("/api/customers", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 };
 
 export const updateCustomer = async (customer: Customer) => {
   const payload = mapCustomerToDB(customer);
-  const { error } = await supabase.from('customers').update(payload).eq('id', customer.id);
-  if (error) throw error;
+  await fetchJSON(`/api/customers/${customer.id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
   return true;
 };
 
 export const deleteCustomer = async (id: string) => {
-  const client = getSupabase();
-  const { error } = await client.from('customers').delete().eq('id', id);
-  if (error) throw error;
+  await fetchJSON(`/api/customers/${id}`, {
+    method: "DELETE"
+  });
   return true;
 };
 
 // --- CLIENTS ---
 export const getStoredClients = async (): Promise<Client[]> => {
-  const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
-  if (error) throw error;
+  const data = await fetchJSON("/api/clients");
   return (data || []).map(mapClientFromDB);
 };
 
 export const saveClient = async (client: Client) => {
   const payload = mapClientToDB(client);
-  const { error } = await supabase.from('clients').insert([payload]);
-  if (error) throw error;
+  await fetchJSON("/api/clients", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
   return true;
 };
 
 export const updateClient = async (client: Client) => {
   const payload = mapClientToDB(client);
-  const { error } = await supabase.from('clients').update(payload).eq('id', client.id);
-  if (error) throw error;
+  await fetchJSON(`/api/clients/${client.id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
   return true;
 };
 
 export const deleteClient = async (clientId: string) => {
-  const client = getSupabase();
-  const { error } = await client.from('clients').delete().eq('id', clientId);
-  if (error) throw error;
+  await fetchJSON(`/api/clients/${clientId}`, {
+    method: "DELETE"
+  });
   return true;
 };
 
 export const updateClientStatus = async (clientId: string, status: 'pending' | 'completed', dataFim: string | null = null, residualHours: number | null = null) => {
-  const updateData: any = { status, data_fim: dataFim };
-  if (residualHours !== null) updateData.residual_hours_added = residualHours;
-  const { error } = await supabase.from('clients').update(updateData).eq('id', clientId);
-  if (error) throw error;
+  await fetchJSON(`/api/clients/${clientId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, data_fim: dataFim, residual_hours_added: residualHours })
+  });
   return true;
 };
 
 export const updateCommissionStatus = async (clientId: string, paid: boolean) => {
-  const { error } = await supabase.from('clients').update({ commission_paid: paid }).eq('id', clientId);
-  if (error) throw error;
+  await fetchJSON(`/api/clients/${clientId}/commission`, {
+    method: "PATCH",
+    body: JSON.stringify({ commission_paid: paid })
+  });
   return true;
 };
 
 export const updateClientComment = async (clientId: string, comentario: string) => {
-  const { error } = await supabase.from('clients').update({ comentario: newlineToBr(comentario) }).eq('id', clientId);
-  if (error) throw error;
+  await fetchJSON(`/api/clients/${clientId}/comment`, {
+    method: "PATCH",
+    body: JSON.stringify({ comentario: newlineToBr(comentario) })
+  });
   return true;
 };
 
 // --- LOGS ---
 export const getStoredLogs = async (): Promise<TrainingLog[]> => {
-  const { data, error } = await supabase.from('training_logs').select('*').order('date', { ascending: false });
-  if (error) throw error;
+  const data = await fetchJSON("/api/logs");
   return (data || []).map(mapLogFromDB);
 };
 
 export const saveLog = async (log: TrainingLog) => {
   const payload = mapLogToDB(log);
-  const { error } = await supabase.from('training_logs').insert([payload]);
-  if (error) throw error;
+  await fetchJSON("/api/logs", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 };
 
 export const updateLog = async (log: TrainingLog) => {
   const payload = mapLogToDB(log);
-  const { error } = await supabase.from('training_logs').update(payload).eq('id', log.id);
-  if (error) throw error;
+  await fetchJSON(`/api/logs/${log.id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
   return true;
 };
 
 export const deleteLog = async (logId: string) => {
-  const { error } = await supabase.from('training_logs').delete().eq('id', logId);
-  if (error) throw error;
+  await fetchJSON(`/api/logs/${logId}`, {
+    method: "DELETE"
+  });
 };
 
 // --- MODULES ---
 export const getStoredModules = async (): Promise<SystemModule[]> => {
-  const { data, error } = await supabase.from('system_modules').select('*').order('name');
-  if (error) throw error;
+  const data = await fetchJSON("/api/modules");
   return data || [];
 };
 
 export const saveModule = async (module: SystemModule) => {
-  const { id, ...data } = module;
-  const { error } = await supabase.from('system_modules').insert([data]);
-  if (error) throw error;
+  await fetchJSON("/api/modules", {
+    method: "POST",
+    body: JSON.stringify(module)
+  });
 };
 
 export const updateModule = async (module: SystemModule) => {
-  const { error } = await supabase.from('system_modules').update(module).eq('id', module.id);
-  if (error) throw error;
+  await fetchJSON(`/api/modules/${module.id}`, {
+    method: "PUT",
+    body: JSON.stringify(module)
+  });
   return true;
 };
 
 export const deleteModule = async (id: string) => {
-  const { error } = await supabase.from('system_modules').delete().eq('id', id);
-  if (error) throw error;
+  await fetchJSON(`/api/modules/${id}`, {
+    method: "DELETE"
+  });
 };
 
 // --- TRAINING TYPES ---
 export const getStoredTrainingTypes = async (): Promise<TrainingTypeEntity[]> => {
-  const { data, error } = await supabase.from('training_types').select('*').order('name');
-  if (error) throw error;
+  const data = await fetchJSON("/api/training-types");
   return data || [];
 };
 
 export const saveTrainingType = async (type: TrainingTypeEntity) => {
-  const { id, ...data } = type;
-  const { error } = await supabase.from('training_types').insert([data]);
-  if (error) throw error;
+  await fetchJSON("/api/training-types", {
+    method: "POST",
+    body: JSON.stringify(type)
+  });
 };
 
 export const updateTrainingType = async (type: TrainingTypeEntity) => {
-  const { error } = await supabase.from('training_types').update(type).eq('id', type.id);
-  if (error) throw error;
+  await fetchJSON(`/api/training-types/${type.id}`, {
+    method: "PUT",
+    body: JSON.stringify(type)
+  });
   return true;
 };
 
 export const deleteTrainingType = async (id: string) => {
-  const { error } = await supabase.from('training_types').delete().eq('id', id);
-  if (error) throw error;
+  await fetchJSON(`/api/training-types/${id}`, {
+    method: "DELETE"
+  });
 };
 
 // --- TIME MANAGEMENT ---
 export const getStoredTimeConfig = async (monthYear: string): Promise<TimeManagementConfig | null> => {
   try {
-    const { data, error } = await supabase.from('time_management_configs').select('*').eq('id', monthYear).single();
-    if (error && error.code !== 'PGRST116') throw error;
+    const data = await fetchJSON(`/api/time-configs/${monthYear}`);
     if (data) {
       return { id: data.id, dias: Number(data.dias || 0), horasPorDia: Number(data.horas_por_dia || 0) };
     }
@@ -357,82 +391,60 @@ export const getStoredTimeConfig = async (monthYear: string): Promise<TimeManage
 };
 
 export const saveTimeConfig = async (config: TimeManagementConfig) => {
-  const { error } = await supabase.from('time_management_configs').upsert({
-    id: config.id,
-    dias: config.dias,
-    horas_por_dia: config.horasPorDia,
-    updated_at: new Date().toISOString()
+  await fetchJSON("/api/time-configs", {
+    method: "POST",
+    body: JSON.stringify({
+      id: config.id,
+      dias: config.dias,
+      horas_por_dia: config.horasPorDia
+    })
   });
-  if (error) throw error;
 };
 
-// --- INTEGRATIONS & BRANDING UNIFICADOS NO ID 1 ---
-
-const getCentralConfig = async () => {
-  try {
-    const { data, error } = await supabase.from('integrations').select('*').eq('id', 1).single();
-    if (error && error.code !== 'PGRST116') throw error;
-    
-    if (data) {
-      try {
-        const parsed = JSON.parse(data.webhook_url);
-        return {
-          appName: data.api_key || 'TrainMaster',
-          webhookUrl: parsed.webhookUrl || '',
-          integrationApiKey: parsed.integrationApiKey || '',
-          appSubtitle: parsed.appSubtitle || 'SISTEMA PRO',
-          logoUrl: parsed.logoUrl || ''
-        };
-      } catch {
-        return {
-          appName: 'TrainMaster',
-          webhookUrl: data.webhook_url || '',
-          integrationApiKey: data.api_key || '',
-          appSubtitle: 'SISTEMA PRO',
-          logoUrl: ''
-        };
-      }
-    }
-  } catch (err) {
-    console.error("Erro ao buscar central config:", err);
-  }
-  return null;
-};
-
+// --- INTEGRATIONS & BRANDING ---
 export const getStoredIntegrations = async (): Promise<IntegrationSettings> => {
-  const config = await getCentralConfig();
-  if (!config) return { apiKey: '', webhookUrl: '' };
-  return { apiKey: config.integrationApiKey, webhookUrl: config.webhookUrl };
+  try {
+    const data = await fetchJSON("/api/central-config");
+    if (!data) return { apiKey: '', webhookUrl: '' };
+    return { apiKey: data.integrationApiKey, webhookUrl: data.webhookUrl };
+  } catch (err) {
+    console.error("Erro ao buscar integracoes:", err);
+    return { apiKey: '', webhookUrl: '' };
+  }
 };
 
 export const saveIntegrations = async (settings: IntegrationSettings) => {
-  const current = await getCentralConfig();
-  const jsonPayload = JSON.stringify({
-    webhookUrl: settings.webhookUrl,
-    integrationApiKey: settings.apiKey,
-    appSubtitle: current?.appSubtitle || 'SISTEMA PRO',
-    logoUrl: current?.logoUrl || ''
-  });
-
-  const { error } = await supabase.from('integrations').upsert({ 
-    id: 1, 
-    api_key: current?.appName || 'TrainMaster', 
-    webhook_url: jsonPayload,
-    updated_at: new Date().toISOString() 
-  });
-  if (error) throw error;
+  try {
+    const current = await fetchJSON("/api/central-config").catch(() => null);
+    await fetchJSON("/api/central-config", {
+      method: "POST",
+      body: JSON.stringify({
+        appName: current?.appName || 'TrainMaster',
+        webhookUrl: settings.webhookUrl,
+        integrationApiKey: settings.apiKey,
+        appSubtitle: current?.appSubtitle || 'SISTEMA PRO',
+        logoUrl: current?.logoUrl || ''
+      })
+    });
+  } catch (err) {
+    console.error("Erro ao salvar integracoes:", err);
+  }
 };
 
 export const getStoredBranding = async (): Promise<BrandingConfig> => {
-  const config = await getCentralConfig();
-  if (config) {
-    const branding = {
-      appName: config.appName,
-      appSubtitle: config.appSubtitle,
-      logoUrl: config.logoUrl
-    };
-    localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(branding));
-    return branding;
+  try {
+    const config = await fetchJSON("/api/central-config").catch(() => null);
+    if (config) {
+      const branding = {
+        appName: config.appName,
+        appSubtitle: config.appSubtitle,
+        logoUrl: config.logoUrl
+      };
+      localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(branding));
+      return branding;
+    }
+  } catch (e) {
+    console.error("Erro ao buscar branding:", e);
   }
 
   const local = localStorage.getItem(BRANDING_LOCAL_KEY);
@@ -444,34 +456,29 @@ export const getStoredBranding = async (): Promise<BrandingConfig> => {
 };
 
 export const saveBranding = async (config: BrandingConfig) => {
-  const current = await getCentralConfig();
-  const jsonPayload = JSON.stringify({
-    webhookUrl: current?.webhookUrl || '',
-    integrationApiKey: current?.integrationApiKey || '',
-    appSubtitle: config.appSubtitle,
-    logoUrl: config.logoUrl
-  });
-
-  const { error } = await supabase.from('integrations').upsert({ 
-    id: 1, 
-    api_key: config.appName, 
-    webhook_url: jsonPayload,
-    updated_at: new Date().toISOString() 
-  });
-  
-  if (error) throw error;
-  localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(config));
-  return true;
+  try {
+    const current = await fetchJSON("/api/central-config").catch(() => null);
+    await fetchJSON("/api/central-config", {
+      method: "POST",
+      body: JSON.stringify({
+        appName: config.appName,
+        webhookUrl: current?.webhookUrl || '',
+        integrationApiKey: current?.integrationApiKey || '',
+        appSubtitle: config.appSubtitle,
+        logoUrl: config.logoUrl
+      })
+    });
+    localStorage.setItem(BRANDING_LOCAL_KEY, JSON.stringify(config));
+    return true;
+  } catch (err) {
+    console.error("Erro ao salvar branding:", err);
+    return false;
+  }
 };
 
 export const getStoredCloudConfig = async () => {
   try {
-    const { data, error } = await supabase.from('integrations').select('*').eq('id', 2).single();
-    if (error) return null;
-    return {
-      url: data.webhook_url, 
-      key: data.api_key      
-    };
+    return await fetchJSON("/api/cloud-config");
   } catch (err) {
     return null;
   }
@@ -479,16 +486,11 @@ export const getStoredCloudConfig = async () => {
 
 export const saveCloudConfigToDB = async (url: string, key: string) => {
   try {
-    resetSupabaseClient();
-    localStorage.setItem(SUPABASE_URL_KEY, url);
-    localStorage.setItem(SUPABASE_KEY_KEY, key);
-    
-    const client = getSupabase();
-    await client.from('integrations').upsert({
-      id: 2,
-      api_key: key,
-      webhook_url: url,
-      updated_at: new Date().toISOString()
+    localStorage.setItem('SUPABASE_URL', url);
+    localStorage.setItem('SUPABASE_ANON_KEY', key);
+    await fetchJSON("/api/cloud-config", {
+      method: "POST",
+      body: JSON.stringify({ url, key })
     });
   } catch (err) {
     console.error("Falha ao persistir cloud config no DB:", err);
