@@ -90,6 +90,23 @@ const App: React.FC = () => {
     refreshData();
   }, [refreshData]);
 
+  useEffect(() => {
+    if (branding) {
+      const name = branding.appName || 'TrainMaster Pro';
+      document.title = name;
+      
+      const metaDesc = document.querySelector("meta[name='description']") as HTMLMetaElement;
+      if (metaDesc) {
+        metaDesc.content = branding.appSubtitle || "SISTEMA PRO";
+      } else {
+        const newMeta = document.createElement("meta");
+        newMeta.name = "description";
+        newMeta.content = branding.appSubtitle || "SISTEMA PRO";
+        document.head.appendChild(newMeta);
+      }
+    }
+  }, [branding]);
+
   const filteredData = useMemo(() => {
     if (!currentUser) return { clients: [], logs: [] };
     if (currentUser.role === UserRole.MANAGER) return { clients, logs };

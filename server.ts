@@ -596,6 +596,120 @@ app.post("/api/central-config", async (req, res) => {
   }
 });
 
+app.get("/manifest.json", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM integrations WHERE id = 1");
+    let appName = "TrainMaster Pro";
+    let appSubtitle = "Gestão Avançada de Treinamentos de Software";
+    
+    if (rows.length > 0) {
+      appName = rows[0].api_key || "TrainMaster Pro";
+      try {
+        const parsed = JSON.parse(rows[0].webhook_url || "{}");
+        appSubtitle = parsed.appSubtitle || "Gestão Avançada de Treinamentos de Software";
+      } catch {}
+    }
+
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.json({
+      "name": appName,
+      "short_name": appName.split(" ")[0] || appName,
+      "description": appSubtitle,
+      "theme_color": "#2563eb",
+      "background_color": "#f8fafc",
+      "display": "standalone",
+      "orientation": "portrait",
+      "start_url": "/",
+      "id": "/",
+      "scope": "/",
+      "icons": [
+        {
+          "src": "/api/app-logo",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        },
+        {
+          "src": "/api/app-logo",
+          "sizes": "512x512",
+          "type": "image/png",
+          "purpose": "any"
+        },
+        {
+          "src": "/api/app-logo",
+          "sizes": "512x512",
+          "type": "image/png",
+          "purpose": "maskable"
+        }
+      ]
+    });
+  } catch (error) {
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.json({
+      "name": "TrainMaster Pro",
+      "short_name": "TrainMaster",
+      "description": "Gestão Avançada de Treinamentos de Software",
+      "theme_color": "#2563eb",
+      "background_color": "#f8fafc",
+      "display": "standalone",
+      "orientation": "portrait",
+      "start_url": "/",
+      "id": "/",
+      "scope": "/",
+      "icons": [
+        {
+          "src": "/icon.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml",
+          "purpose": "any"
+        },
+        {
+          "src": "/icon.svg",
+          "sizes": "512x512",
+          "type": "image/svg+xml",
+          "purpose": "any"
+        }
+      ]
+    });
+  }
+});
+
+app.get("/api/app-logo", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM integrations WHERE id = 1");
+    let logoUrl = "";
+    if (rows.length > 0) {
+      try {
+        const parsed = JSON.parse(rows[0].webhook_url || "{}");
+        logoUrl = parsed.logoUrl || "";
+      } catch {}
+    }
+    
+    if (logoUrl) {
+      if (logoUrl.startsWith("data:")) {
+        const matches = logoUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const contentType = matches[1];
+          const buffer = Buffer.from(matches[2], 'base64');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          return res.send(buffer);
+        }
+      } else {
+        return res.redirect(logoUrl);
+      }
+    }
+    
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(path.join(process.cwd(), "public", "icon.svg"));
+  } catch {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(path.join(process.cwd(), "public", "icon.svg"));
+  }
+});
+
 app.get("/api/cloud-config", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM integrations WHERE id = 2");
