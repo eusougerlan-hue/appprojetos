@@ -11,6 +11,7 @@ interface CommissionPaymentProps {
 const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshData }) => {
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'PAID'>('ALL');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [confirmPaymentId, setConfirmPaymentId] = useState<string | null>(null);
 
   // Filtramos apenas os clientes que já tiveram o treinamento finalizado
   const completedClients = useMemo(() => {
@@ -32,6 +33,10 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
         return true;
       });
   }, [completedClients, filter]);
+
+  const selectedClient = useMemo(() => {
+    return commissions.find(c => c.id === confirmPaymentId);
+  }, [commissions, confirmPaymentId]);
 
   const handleTogglePaid = async (clientId: string, currentStatus: boolean) => {
     setUpdatingId(clientId);
@@ -151,7 +156,13 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
                     {c.commissionPaid ? 'Lançado em Histórico' : 'Confirmar Pagamento'}
                   </span>
                   <button
-                    onClick={() => handleTogglePaid(c.id, !!c.commissionPaid)}
+                    onClick={() => {
+                      if (!c.commissionPaid) {
+                        setConfirmPaymentId(c.id);
+                      } else {
+                        handleTogglePaid(c.id, !!c.commissionPaid);
+                      }
+                    }}
                     disabled={updatingId === c.id}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${
                       c.commissionPaid 
@@ -180,6 +191,65 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
           As comissões são baseadas no percentual definido no cadastro do cliente vindo da API. Esta tela serve para o gestor financeiro controlar quais valores já foram repassados aos funcionários responsáveis técnicos pelas implantações <strong className="text-slate-500">concluídas</strong> e monetizadas.
         </p>
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmPaymentId && selectedClient && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-[2.5rem] max-w-md w-full p-8 shadow-2xl border border-slate-100 relative overflow-hidden animate-scaleIn">
+            <div className="mx-auto w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-6 border border-amber-100">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            
+            <h3 className="text-xl font-black text-slate-800 text-center tracking-tight mb-2">
+              Confirmar Pagamento?
+            </h3>
+            <p className="text-xs text-slate-500 text-center leading-relaxed mb-6 font-medium">
+              Tem certeza que deseja confirmar o pagamento de comissão para este treinamento? Esta ação registrará o pagamento no histórico.
+            </p>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-left mb-6 space-y-3">
+              <div>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Responsável Técnico</span>
+                <span className="text-xs font-bold text-slate-700">{selectedClient.responsavelTecnico}</span>
+              </div>
+              <div>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Cliente / Razão Social</span>
+                <span className="text-xs font-bold text-slate-700">{selectedClient.razãoSocial}</span>
+              </div>
+              <div className="pt-3 border-t border-slate-150 flex justify-between items-center">
+                <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Valor Líquido ({selectedClient.comissaoPercent}%)</span>
+                <span className="text-sm font-black text-blue-600">
+                  R$ {selectedClient.commissionValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmPaymentId(null)}
+                className="flex-1 py-3.5 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 text-center"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmPaymentId) {
+                    handleTogglePaid(confirmPaymentId, false);
+                    setConfirmPaymentId(null);
+                  }
+                }}
+                className="flex-1 py-3.5 px-5 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-100 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 text-center"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
