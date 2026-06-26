@@ -67,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
   return (
     <div className="space-y-6 animate-fadeIn">
       <header className="flex flex-col gap-1 mb-2">
-        <h1 className="text-2xl font-black text-gray-800 tracking-tight">Olá, Gestor!</h1>
+        <h1 className="text-2xl font-black text-gray-800 tracking-tight">Olá, {user.name}!</h1>
         <p className="text-sm text-gray-500 font-medium">Bem-vindo ao painel de controle de treinamentos.</p>
       </header>
 
