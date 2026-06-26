@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Client, TransportType, TrainingLog, User, UserRole, Customer, Contact } from '../types';
 import { saveLog, updateLog, deleteLog, getStoredIntegrations, getStoredCustomers, normalizeString } from '../storage';
 
@@ -17,6 +17,65 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Reconhecimento de voz não é suportado neste navegador.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setFormData(prev => {
+            const currentObs = prev.observation ? prev.observation.trim() : '';
+            const separator = currentObs ? ' ' : '';
+            return {
+              ...prev,
+              observation: currentObs + separator + transcript
+            };
+          });
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (error) {
+      console.error("Error starting speech recognition:", error);
+      setIsListening(false);
+    }
+  };
 
   const fetchInitialData = async () => {
     try {
@@ -470,7 +529,27 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
           </div>
 
           <div>
-            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Observações</label>
+            <div className="flex items-center justify-between mb-1.5 ml-1">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Observações</label>
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                  isListening 
+                    ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-100' 
+                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
+                }`}
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isListening ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  )}
+                </svg>
+                {isListening ? 'Ouvindo... Clique para parar' : 'Falar (Gravar Voz)'}
+              </button>
+            </div>
             <textarea className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 h-24 text-xs font-bold text-slate-700 outline-none resize-none bg-slate-50/30" value={formData.observation} onChange={(e) => setFormData({...formData, observation: e.target.value})} placeholder="O que foi treinado hoje?"></textarea>
           </div>
         </div>
