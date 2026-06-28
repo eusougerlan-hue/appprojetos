@@ -696,6 +696,19 @@ app.get("/api/app-logo", async (req, res) => {
           return res.send(buffer);
         }
       } else {
+        try {
+          const response = await fetch(logoUrl);
+          if (response.ok) {
+            const contentType = response.headers.get("content-type") || "image/png";
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            return res.send(buffer);
+          }
+        } catch (fetchErr) {
+          console.error("Error proxying PWA logo:", fetchErr);
+        }
         return res.redirect(logoUrl);
       }
     }
