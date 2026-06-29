@@ -114,7 +114,7 @@ const CommissionPayment: React.FC<CommissionPaymentProps> = ({ clients, refreshD
               <div 
                 key={c.id} 
                 className={`bg-white rounded-[2rem] p-5 shadow-sm border transition-all ${
-                  c.commissionPaid ? 'border-slate-50 opacity-80' : 'border-slate-100'
+                  c.commissionPaid ? 'border-slate-200 opacity-80' : 'border-slate-200'
                 }`}
               >
                 <div className="flex justify-between items-start mb-4">

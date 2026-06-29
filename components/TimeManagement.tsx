@@ -85,7 +85,7 @@ const TimeManagement: React.FC<TimeManagementProps> = ({ clients, logs }) => {
 
   return (
     <div className="animate-fadeIn space-y-6">
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6">
         <div className="mb-6">
           <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none">Gestão de Tempo</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2 leading-relaxed">
@@ -157,7 +157,7 @@ const TimeManagement: React.FC<TimeManagementProps> = ({ clients, logs }) => {
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

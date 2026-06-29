@@ -124,7 +124,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
   if (viewMode === 'list') {
     return (
       <div className="animate-fadeIn pb-10">
-        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 pb-4 flex justify-between items-start">
             <div>
               <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none">Equipe de Funcionários</h2>
@@ -139,13 +139,13 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onComplete 
             </button>
           </div>
 
-          <div className="px-6 py-4 bg-slate-50/30 border-t border-slate-50 flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="px-6 py-4 bg-slate-50/30 border-t border-slate-200 flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
             <span className="w-1/3">Nome / Cargo</span>
             <span className="w-1/4 text-center">CPF (Login)</span>
             <span className="w-1/3 text-right">Contato</span>
           </div>
 
-          <div className="divide-y divide-slate-50 min-h-[400px]">
+          <div className="divide-y divide-slate-200 min-h-[400px]">
             {loading && users.length === 0 ? (
               <div className="p-20 flex justify-center"><div className="animate-spin h-8 w-8 border-b-2 border-blue-600 rounded-full"></div></div>
             ) : users.map((u) => (

@@ -601,12 +601,27 @@ app.get("/manifest.json", async (req, res) => {
     const { rows } = await pool.query("SELECT * FROM integrations WHERE id = 1");
     let appName = "TrainMaster Pro";
     let appSubtitle = "Gestão Avançada de Treinamentos de Software";
-    
+    let logoType = "image/svg+xml"; // Fallback padrão é o icon.svg
+
     if (rows.length > 0) {
       appName = rows[0].api_key || "TrainMaster Pro";
       try {
         const parsed = JSON.parse(rows[0].webhook_url || "{}");
         appSubtitle = parsed.appSubtitle || "Gestão Avançada de Treinamentos de Software";
+        const logoUrl = parsed.logoUrl || "";
+        if (logoUrl) {
+          if (logoUrl.startsWith("data:image/png")) {
+            logoType = "image/png";
+          } else if (logoUrl.startsWith("data:image/jpeg") || logoUrl.startsWith("data:image/jpg")) {
+            logoType = "image/jpeg";
+          } else if (logoUrl.startsWith("data:image/svg") || logoUrl.toLowerCase().endsWith(".svg")) {
+            logoType = "image/svg+xml";
+          } else if (logoUrl.toLowerCase().endsWith(".jpg") || logoUrl.toLowerCase().endsWith(".jpeg")) {
+            logoType = "image/jpeg";
+          } else {
+            logoType = "image/png";
+          }
+        }
       } catch {}
     }
 
@@ -626,19 +641,19 @@ app.get("/manifest.json", async (req, res) => {
         {
           "src": "/api/app-logo",
           "sizes": "192x192",
-          "type": "image/png",
+          "type": logoType,
           "purpose": "any"
         },
         {
           "src": "/api/app-logo",
           "sizes": "512x512",
-          "type": "image/png",
+          "type": logoType,
           "purpose": "any"
         },
         {
           "src": "/api/app-logo",
           "sizes": "512x512",
-          "type": "image/png",
+          "type": logoType,
           "purpose": "maskable"
         }
       ]

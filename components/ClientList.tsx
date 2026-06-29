@@ -121,7 +121,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refresh
               <div 
                 key={client.id} 
                 onClick={() => handleView(client)}
-                className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group"
+                className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1 min-w-0 pr-4">

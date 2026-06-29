@@ -296,8 +296,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden animate-fadeIn">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-fadeIn">
+        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/30">
           <div>
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Vendas Recentes</h2>
             <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Gestão de Contratos Ativos</p>
@@ -317,7 +317,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
 
         <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pb-10">
           {visibleClients.map(client => (
-            <div key={client.id} className="p-4 border border-slate-100 rounded-2xl bg-white flex justify-between items-center shadow-sm hover:shadow-md transition-all">
+            <div key={client.id} className="p-4 border border-slate-200 rounded-2xl bg-white flex justify-between items-center shadow-sm hover:shadow-md transition-all">
               <div className="flex-1 min-w-0 pr-4">
                 <p className="text-[9px] font-black text-blue-600 uppercase mb-0.5 truncate">{client.protocolo || 'AGUARDANDO GERAÇÃO'}</p>
                 <p className="font-bold text-slate-800 text-xs truncate leading-tight">{client.razãoSocial}</p>
@@ -342,7 +342,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   }
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 animate-slideUp overflow-hidden relative">
+    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 animate-slideUp overflow-hidden relative">
       {(generatingProtocol || loading) && (
         <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-10 text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-8 shadow-xl"></div>

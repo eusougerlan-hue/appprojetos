@@ -78,7 +78,7 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
             const saldoHoras = horasContratadas - horasUtilizadas;
 
             return (
-              <div key={client.id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all active:scale-[0.98]">
+              <div key={client.id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200 hover:shadow-md transition-all active:scale-[0.98]">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">{client.protocolo}</p>
@@ -95,17 +95,10 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
                       ))}
                     </div>
                   </div>
-                  
-                  <div className="flex flex-col items-end gap-1">
-                    <span className={`text-[14px] font-black ${isDelayed ? 'text-red-600' : daysPending > 15 ? 'text-orange-500' : 'text-blue-400'}`}>
-                      {daysPending}
-                    </span>
-                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-tighter">dias pend.</span>
-                  </div>
                 </div>
 
                 {/* New Columns Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
                   <div className="flex flex-col">
                     <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Início do Projeto</span>
                     <span className="text-[10px] font-black text-slate-700">{hasStarted ? formattedStartDate : 'Não iniciado'}</span>
@@ -121,6 +114,10 @@ const PendingTrainings: React.FC<PendingTrainingsProps> = ({ clients, logs, setV
                   <div className="flex flex-col">
                     <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Saldo</span>
                     <span className={`text-[10px] font-black ${saldoHoras < 0 ? 'text-red-500' : 'text-green-600'}`}>{saldoHoras.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Dias Pend.</span>
+                    <span className={`text-[10px] font-black ${isDelayed ? 'text-red-600' : daysPending > 15 ? 'text-orange-500' : 'text-blue-500'}`}>{daysPending}</span>
                   </div>
                   <div className="flex flex-col col-span-2 md:col-span-1">
                     <span className="text-[7px] text-slate-400 font-black uppercase tracking-widest mb-1">Comentário</span>

@@ -112,7 +112,7 @@ const TrainingTypeManagement: React.FC<TrainingTypeManagementProps> = ({ onCompl
       </div>
 
       {/* Add/Edit Form Card */}
-      <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200">
         <form onSubmit={handleAddOrUpdate} className="flex flex-col gap-4">
           <div className="relative">
             <input
@@ -172,7 +172,7 @@ const TrainingTypeManagement: React.FC<TrainingTypeManagementProps> = ({ onCompl
               <div key={t.id} className={`flex items-center justify-between p-4 bg-white rounded-[1.5rem] border transition-all ${
                 editingType?.id === t.id 
                   ? 'border-orange-200 ring-4 ring-orange-500/5' 
-                  : 'border-slate-50 shadow-sm'
+                  : 'border-slate-200 shadow-sm'
               }`}>
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-[10px] uppercase tracking-tighter ${

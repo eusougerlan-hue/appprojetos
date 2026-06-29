@@ -319,7 +319,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
             const technician = getResponsibleTechnician(client);
 
             return (
-              <div key={client.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border transition-all ${isCompleted ? 'border-slate-50 opacity-80' : 'border-slate-100 shadow-slate-200/50 hover:shadow-md'}`}>
+              <div key={client.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border transition-all ${isCompleted ? 'border-slate-200 opacity-85' : 'border-slate-200 shadow-slate-200/50 hover:shadow-md'}`}>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1 min-w-0 pr-4">
                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-[0.2em] mb-1 truncate">{client.protocolo}</p>

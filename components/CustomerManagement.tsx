@@ -203,7 +203,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ user, onComplet
               const linkedPurchasesCount = allClients.filter(c => c.customerId === customer.id).length;
               
               return (
-                <div key={customer.id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 animate-slideUp">
+                <div key={customer.id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200 animate-slideUp">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1 pr-4">
                       <h3 className="text-sm font-black text-slate-800 leading-tight mb-1">{customer.razãoSocial}</h3>
