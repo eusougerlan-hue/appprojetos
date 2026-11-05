@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity } from '../types';
-import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredUsers, updateClient, deleteClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
+import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredUsers, updateClient, deleteClient, getStoredTrainingTypes, getStoredIntegrations, normalizeString } from '../storage';
 
 interface TrainingPurchaseProps {
   user: User;
@@ -17,6 +17,7 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTech, setSelectedTech] = useState<string>('ALL');
   const [loading, setLoading] = useState(false);
   const [generatingProtocol, setGeneratingProtocol] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
@@ -69,16 +70,36 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     loadData();
   }, [viewMode]);
 
+  // Build unique technicians list with sales counts for manager filter
+  const technicianList = useMemo(() => {
+    const techCounts = new Map<string, number>();
+    allClients.forEach(c => {
+      const tech = c.responsavelTecnico;
+      if (tech) {
+        techCounts.set(tech, (techCounts.get(tech) || 0) + 1);
+      }
+    });
+    return Array.from(techCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allClients]);
+
   const visibleClients = useMemo(() => {
     let list = [...allClients];
     if (!isManager) {
-      list = list.filter(client => client.responsavelTecnico === user.name);
+      list = list.filter(client => normalizeString(client.responsavelTecnico) === normalizeString(user.name));
+    } else if (selectedTech !== 'ALL') {
+      list = list.filter(client => normalizeString(client.responsavelTecnico) === normalizeString(selectedTech));
     }
     if (searchTerm.trim()) {
-      list = list.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
+      const search = searchTerm.toLowerCase();
+      list = list.filter(c => 
+        c.razãoSocial.toLowerCase().includes(search) || 
+        (c.protocolo && c.protocolo.toLowerCase().includes(search))
+      );
     }
     return list;
-  }, [allClients, user, searchTerm, isManager]);
+  }, [allClients, user, searchTerm, isManager, selectedTech]);
 
   const keyUsers = useMemo(() => {
     if (!formData.customerId) return [];
@@ -392,14 +413,45 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           <button onClick={() => { resetForm(); setViewMode('form'); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Nova Venda</button>
         </div>
         
-        <div className="p-4 bg-slate-50/30 border-b border-slate-50">
+        <div className="p-4 bg-slate-50/30 border-b border-slate-200 space-y-3">
           <input 
             type="text" 
-            placeholder="Pesquisar cliente..." 
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold text-xs bg-white"
+            placeholder="Pesquisar cliente ou protocolo..." 
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold text-xs bg-white focus:ring-2 focus:ring-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+
+          {isManager && technicianList.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={selectedTech}
+                  onChange={(e) => setSelectedTech(e.target.value)}
+                  className="w-full bg-white border border-slate-200 text-slate-700 py-2.5 px-4 pr-9 rounded-xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+                >
+                  <option value="ALL">Todos os Técnicos</option>
+                  {technicianList.map(t => (
+                    <option key={t.name} value={t.name}>
+                      {t.name} ({t.count})
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
+              {selectedTech !== 'ALL' && (
+                <button
+                  onClick={() => setSelectedTech('ALL')}
+                  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
+                  title="Ver todos"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pb-10">
@@ -408,9 +460,14 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
               <div className="flex-1 min-w-0 pr-4">
                 <p className="text-[9px] font-black text-blue-600 uppercase mb-0.5 truncate">{client.protocolo || 'AGUARDANDO GERAÇÃO'}</p>
                 <p className="font-bold text-slate-800 text-xs truncate leading-tight">{client.razãoSocial}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
                    <span className="text-[7px] bg-slate-50 text-slate-400 px-1.5 py-0.5 rounded border border-slate-100 font-black uppercase">{client.tipoTreinamento}</span>
                    <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">{client.duracaoHoras}h Contratadas</span>
+                   {client.responsavelTecnico && (
+                     <span className="text-[7px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-black uppercase">
+                       {client.responsavelTecnico}
+                     </span>
+                   )}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">

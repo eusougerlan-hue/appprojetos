@@ -1,18 +1,21 @@
 
 import React, { useState, useMemo } from 'react';
-import { Client, ViewState, TrainingLog } from '../types';
-import { deleteClient } from '../storage';
+import { Client, ViewState, TrainingLog, User, UserRole } from '../types';
+import { deleteClient, normalizeString } from '../storage';
 
 interface ClientListProps {
   clients: Client[];
   logs: TrainingLog[];
+  user: User;
   setView: (view: ViewState) => void;
   onEditClient: (client: Client) => void;
   refreshData: () => void;
 }
 
-const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refreshData }) => {
+const ClientList: React.FC<ClientListProps> = ({ clients, logs, user, setView, refreshData }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTech, setSelectedTech] = useState<string>('ALL');
+  const isManager = user?.role === UserRole.MANAGER;
 
   const getResponsibleTechnician = (client: Client) => {
     const clientLogs = logs.filter(l => l.clientId === client.id);
@@ -21,6 +24,22 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refresh
     }
     return client.responsavelTecnico || 'Não identificado';
   };
+
+  // Build list of unique technicians for the filter
+  const technicianList = useMemo(() => {
+    const techCounts = new Map<string, number>();
+    clients.forEach(c => {
+      if (c.status === 'completed' && (c.residualHoursAdded || 0) > 0) {
+        const tech = getResponsibleTechnician(c);
+        if (tech) {
+          techCounts.set(tech, (techCounts.get(tech) || 0) + 1);
+        }
+      }
+    });
+    return Array.from(techCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [clients, logs]);
 
   const filteredClients = useMemo(() => {
     // 1. Identifica quais IDs de clientes (Customer) possuem projetos pendentes (vendas novas/ativas)
@@ -59,11 +78,16 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refresh
       }
     });
 
-    const baseList = [...Array.from(latestResidualsByCustomer.values()), ...residualsWithoutCustomer];
+    let baseList = [...Array.from(latestResidualsByCustomer.values()), ...residualsWithoutCustomer];
+
+    // Filter by technician if manager selected a specific technician
+    if (isManager && selectedTech !== 'ALL') {
+      baseList = baseList.filter(c => normalizeString(getResponsibleTechnician(c)) === normalizeString(selectedTech));
+    }
     
     if (!searchTerm.trim()) return baseList;
     return baseList.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [clients, searchTerm]);
+  }, [clients, searchTerm, isManager, selectedTech, logs]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -76,20 +100,53 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, setView, refresh
           </p>
         </div>
 
-        {/* Search Bar - Aesthetic version */}
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <svg className="h-4 w-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        {/* Search & Filter Bar */}
+        <div className="space-y-3">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="h-4 w-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              className="block w-full pl-11 pr-4 py-3.5 border border-slate-200 rounded-2xl bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-xs font-bold text-slate-700"
+              placeholder="Buscar por razão social..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <input
-            type="text"
-            className="block w-full pl-11 pr-4 py-3.5 border-2 border-slate-50 rounded-2xl bg-slate-50/50 placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white transition-all text-xs font-bold text-slate-700"
-            placeholder="Buscar por razão social..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+
+          {isManager && technicianList.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={selectedTech}
+                  onChange={(e) => setSelectedTech(e.target.value)}
+                  className="w-full bg-slate-50/80 border border-slate-200 text-slate-700 py-2.5 px-4 pr-9 rounded-xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+                >
+                  <option value="ALL">Todos os Técnicos</option>
+                  {technicianList.map(t => (
+                    <option key={t.name} value={t.name}>
+                      {t.name} ({t.count})
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
+              {selectedTech !== 'ALL' && (
+                <button
+                  onClick={() => setSelectedTech('ALL')}
+                  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
+                  title="Ver todos"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

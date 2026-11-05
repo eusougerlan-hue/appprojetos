@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Client, TrainingLog, User, UserRole, Contact, Customer } from '../types';
-import { updateClientStatus, getStoredIntegrations, getStoredUsers, getStoredCustomers } from '../storage';
+import { updateClientStatus, getStoredIntegrations, getStoredUsers, getStoredCustomers, normalizeString } from '../storage';
 
 interface HoursManagementProps {
   clients: Client[];
@@ -16,10 +16,8 @@ type StatusFilter = 'ALL' | 'PENDING' | 'COMPLETED';
 const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, refreshData }) => {
   const isManager = user.role === UserRole.MANAGER;
   
-  const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
+  const [selectedTech, setSelectedTech] = useState<string>(isManager ? 'ALL' : user.name);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [allTechnicians, setAllTechnicians] = useState<string[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   
@@ -33,22 +31,11 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
         getStoredUsers(),
         getStoredCustomers()
       ]);
-      
       setAllUsers(storedUsers);
       setCustomers(storedCustomers);
-
-      if (!isManager) {
-        setSelectedTechs([user.name]);
-      } else {
-        const techNames = Array.from(new Set([
-          ...storedUsers.map(u => u.name),
-          ...clients.map(c => c.responsavelTecnico)
-        ])).filter(Boolean).sort();
-        setAllTechnicians(techNames);
-      }
     };
     fetchData();
-  }, [clients, isManager, user.name]);
+  }, []);
 
   const getUsedHours = (clientId: string) => {
     return logs
@@ -63,6 +50,20 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
     }
     return client.responsavelTecnico || 'Não identificado';
   };
+
+  // Build unique technicians list with project counts for manager filter
+  const technicianList = useMemo(() => {
+    const techCounts = new Map<string, number>();
+    clients.forEach(c => {
+      const tech = getResponsibleTechnician(c);
+      if (tech) {
+        techCounts.set(tech, (techCounts.get(tech) || 0) + 1);
+      }
+    });
+    return Array.from(techCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [clients, logs]);
 
   const triggerFinalizeWebhook = async (client: Client, usedHours: number, balance: number, technicianName: string, message: string) => {
     const settings = await getStoredIntegrations();
@@ -162,20 +163,12 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
     setFinalizeMessage('');
   };
 
-  const toggleTechFilter = (tech: string) => {
-    if (!isManager) return;
-    setSelectedTechs(prev => 
-      prev.includes(tech) ? prev.filter(t => t !== tech) : [...prev, tech]
-    );
-  };
-
   const filteredClients = useMemo(() => {
     let list = [...clients];
-    if (selectedTechs.length > 0) {
-      list = list.filter(client => {
-        const currentTech = getResponsibleTechnician(client);
-        return selectedTechs.includes(currentTech);
-      });
+    if (!isManager) {
+      list = list.filter(client => normalizeString(getResponsibleTechnician(client)) === normalizeString(user.name));
+    } else if (selectedTech !== 'ALL') {
+      list = list.filter(client => normalizeString(getResponsibleTechnician(client)) === normalizeString(selectedTech));
     }
     if (statusFilter !== 'ALL') {
       const targetStatus = statusFilter === 'PENDING' ? 'pending' : 'completed';
@@ -185,7 +178,7 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
       if (a.status === b.status) return a.razãoSocial.localeCompare(b.razãoSocial);
       return a.status === 'pending' ? -1 : 1;
     });
-  }, [clients, selectedTechs, statusFilter, logs]);
+  }, [clients, selectedTech, statusFilter, isManager, user.name, logs]);
 
   return (
     <div className="animate-fadeIn">
@@ -274,30 +267,33 @@ const HoursManagement: React.FC<HoursManagementProps> = ({ clients, logs, user, 
             <button onClick={() => setStatusFilter('COMPLETED')} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${statusFilter === 'COMPLETED' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-400'}`}>Finalizados</button>
           </div>
 
-          {isManager && (
-            <div className="relative">
-              <button
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="w-full flex items-center justify-between px-5 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm text-[11px] font-black text-slate-700 uppercase tracking-widest transition-all active:scale-[0.98]"
-              >
-                <span className="truncate">
-                  {selectedTechs.length === 0 ? 'Todos os Técnicos' : selectedTechs.length === 1 ? selectedTechs[0] : `${selectedTechs.length} Selecionados`}
-                </span>
-                <svg className={`w-4 h-4 text-blue-500 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
-              </button>
-              
-              {isFilterOpen && (
-                <>
-                  <div className="fixed inset-0 z-[60]" onClick={() => setIsFilterOpen(false)}></div>
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-[2rem] shadow-2xl z-[70] p-4 animate-slideDown max-h-64 overflow-y-auto custom-scrollbar">
-                    {allTechnicians.map(tech => (
-                      <label key={tech} className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors ${selectedTechs.includes(tech) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-slate-300" checked={selectedTechs.includes(tech)} onChange={() => toggleTechFilter(tech)} />
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${selectedTechs.includes(tech) ? 'text-blue-700' : 'text-slate-600'}`}>{tech}</span>
-                      </label>
-                    ))}
-                  </div>
-                </>
+          {isManager && technicianList.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={selectedTech}
+                  onChange={(e) => setSelectedTech(e.target.value)}
+                  className="w-full bg-white border border-slate-200 text-slate-700 py-3 px-4 pr-9 rounded-2xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+                >
+                  <option value="ALL">Todos os Técnicos</option>
+                  {technicianList.map(t => (
+                    <option key={t.name} value={t.name}>
+                      {t.name} ({t.count})
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
+              {selectedTech !== 'ALL' && (
+                <button
+                  onClick={() => setSelectedTech('ALL')}
+                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
+                  title="Ver todos"
+                >
+                  Limpar
+                </button>
               )}
             </div>
           )}
