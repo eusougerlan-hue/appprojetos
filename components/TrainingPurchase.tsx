@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity } from '../types';
-import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredUsers, updateClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
+import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredUsers, updateClient, deleteClient, getStoredTrainingTypes, getStoredIntegrations } from '../storage';
 
 interface TrainingPurchaseProps {
   user: User;
@@ -19,6 +19,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatingProtocol, setGeneratingProtocol] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   const isManager = user.role === UserRole.MANAGER;
 
@@ -294,9 +296,94 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
     });
   };
 
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteClient(clientToDelete.id);
+      setAllClients(prev => prev.filter(c => c.id !== clientToDelete.id));
+      if (editingId === clientToDelete.id) {
+        resetForm();
+        setViewMode('list');
+      }
+      setClientToDelete(null);
+      onComplete();
+    } catch (err: any) {
+      console.error('Erro ao excluir venda:', err);
+      alert(`Erro ao excluir venda: ${err.message || 'Verifique a conexão.'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const renderDeleteModal = () => {
+    if (!clientToDelete) return null;
+    return (
+      <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+        <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full shadow-2xl border border-slate-200 animate-scaleUp">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-sm">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </div>
+
+          <h3 className="text-base font-black text-slate-800 text-center leading-tight mb-1">
+            Excluir Venda?
+          </h3>
+          <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest text-center mb-4">
+            Protocolo: {clientToDelete.protocolo || 'Sem protocolo'}
+          </p>
+
+          <div className="bg-slate-50 rounded-2xl p-4 mb-4 border border-slate-200 text-left space-y-1.5">
+            <p className="text-xs font-black text-slate-800 leading-tight">
+              {clientToDelete.razãoSocial}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 text-[9px] text-slate-500 font-bold">
+              <span className="bg-white px-2 py-0.5 rounded border border-slate-200 uppercase">{clientToDelete.tipoTreinamento}</span>
+              <span>•</span>
+              <span>{clientToDelete.duracaoHoras}h Contratadas</span>
+            </div>
+            {clientToDelete.responsavelTecnico && (
+              <p className="text-[9px] text-slate-400 font-medium">
+                Instrutor: <span className="font-bold text-slate-600">{clientToDelete.responsavelTecnico}</span>
+              </p>
+            )}
+          </div>
+
+          <p className="text-[10px] text-rose-600 font-medium text-center leading-relaxed mb-6">
+            Atenção: Esta ação removerá definitivamente este contrato de treinamento do sistema.
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setClientToDelete(null)}
+              disabled={deleting}
+              className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-95"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteClient}
+              disabled={deleting}
+              className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-rose-200 active:scale-95 flex items-center justify-center gap-2"
+            >
+              {deleting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                'Sim, Excluir'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-fadeIn">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-fadeIn relative">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/30">
           <div>
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Vendas Recentes</h2>
@@ -326,9 +413,24 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
                    <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">{client.duracaoHoras}h Contratadas</span>
                 </div>
               </div>
-              <button onClick={() => handleEdit(client)} className="bg-slate-50 text-blue-600 p-2.5 rounded-xl hover:bg-blue-50 transition-all">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              </button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button 
+                  onClick={() => handleEdit(client)} 
+                  title="Editar Venda"
+                  className="bg-slate-50 text-blue-600 p-2.5 rounded-xl hover:bg-blue-50 transition-all border border-slate-100 hover:border-blue-200"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                </button>
+                <button 
+                  onClick={() => setClientToDelete(client)} 
+                  title="Excluir Venda"
+                  className="bg-slate-50 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-2.5 rounded-xl transition-all border border-slate-100 hover:border-rose-200"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))}
           {visibleClients.length === 0 && (
@@ -337,6 +439,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
             </div>
           )}
         </div>
+
+        {renderDeleteModal()}
       </div>
     );
   }
@@ -488,8 +592,26 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
           <button type="submit" disabled={generatingProtocol || loading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-[0.2em] text-[10px] active:scale-95 transition-all mt-6">
             {editingId ? 'Salvar Alterações' : 'Confirmar e Gerar Protocolo'}
           </button>
+
+          {editingId && (
+            <button
+              type="button"
+              onClick={() => {
+                const found = allClients.find(c => c.id === editingId);
+                if (found) setClientToDelete(found);
+              }}
+              className="w-full py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-black rounded-2xl uppercase tracking-widest text-[9px] transition-all border border-rose-200 active:scale-95 flex items-center justify-center gap-2 mt-3"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Excluir Esta Venda
+            </button>
+          )}
         </form>
       </div>
+
+      {renderDeleteModal()}
     </div>
   );
 };
