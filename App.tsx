@@ -112,10 +112,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
-    // Atualização periódica (polling) a cada 10s para tocar alerta sonoro ao receber nova venda
+    // Atualização periódica (polling) a cada 4s para detectar novas vendas via API instantaneamente
     const interval = setInterval(() => {
       refreshData();
-    }, 10000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [refreshData]);
 
