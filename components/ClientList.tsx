@@ -41,7 +41,13 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, user, setView, r
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [clients, logs]);
 
-  const filteredClients = useMemo(() => {
+  const isMyResidual = (client: Client) => {
+    const tech = getResponsibleTechnician(client);
+    return normalizeString(tech) === normalizeString(user?.name || '') ||
+           normalizeString(client.responsavelTecnico) === normalizeString(user?.name || '');
+  };
+
+  const baseResiduals = useMemo(() => {
     // 1. Identifica quais IDs de clientes (Customer) possuem projetos pendentes (vendas novas/ativas)
     const customerIdsWithPending = new Set(
       clients.filter(c => c.status === 'pending' && c.customerId).map(c => c.customerId)
@@ -78,16 +84,31 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, user, setView, r
       }
     });
 
-    let baseList = [...Array.from(latestResidualsByCustomer.values()), ...residualsWithoutCustomer];
+    return [...Array.from(latestResidualsByCustomer.values()), ...residualsWithoutCustomer];
+  }, [clients]);
 
-    // Filter by technician if manager selected a specific technician
-    if (isManager && selectedTech !== 'ALL') {
-      baseList = baseList.filter(c => normalizeString(getResponsibleTechnician(c)) === normalizeString(selectedTech));
+  const myResidualCount = useMemo(() => {
+    return baseResiduals.filter(c => isMyResidual(c)).length;
+  }, [baseResiduals, user?.name]);
+
+  const filteredClients = useMemo(() => {
+    let list = [...baseResiduals];
+
+    // Filter by technician if manager selected a specific technician or 'ME'
+    if (!isManager) {
+      list = list.filter(c => isMyResidual(c));
+    } else if (selectedTech === 'ME') {
+      list = list.filter(c => isMyResidual(c));
+    } else if (selectedTech !== 'ALL') {
+      list = list.filter(c => 
+        normalizeString(getResponsibleTechnician(c)) === normalizeString(selectedTech) ||
+        normalizeString(c.responsavelTecnico) === normalizeString(selectedTech)
+      );
     }
     
-    if (!searchTerm.trim()) return baseList;
-    return baseList.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [clients, searchTerm, isManager, selectedTech, logs]);
+    if (!searchTerm.trim()) return list;
+    return list.filter(c => c.razãoSocial.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [baseResiduals, searchTerm, isManager, selectedTech, user?.name]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -117,34 +138,57 @@ const ClientList: React.FC<ClientListProps> = ({ clients, logs, user, setView, r
             />
           </div>
 
-          {isManager && technicianList.length > 0 && (
-            <div className="flex items-center gap-2">
+          {isManager && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <div className="relative flex-1">
                 <select
                   value={selectedTech}
                   onChange={(e) => setSelectedTech(e.target.value)}
                   className="w-full bg-slate-50/80 border border-slate-200 text-slate-700 py-2.5 px-4 pr-9 rounded-xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
                 >
-                  <option value="ALL">Todos os Técnicos</option>
-                  {technicianList.map(t => (
-                    <option key={t.name} value={t.name}>
-                      {t.name} ({t.count})
-                    </option>
-                  ))}
+                  <option value="ALL">Todos os Técnicos ({baseResiduals.length})</option>
+                  <option value="ME">👤 Apenas Meus Registros ({user?.name}) ({myResidualCount})</option>
+                  {technicianList
+                    .filter(t => normalizeString(t.name) !== normalizeString(user?.name || ''))
+                    .map(t => (
+                      <option key={t.name} value={t.name}>
+                        {t.name} ({t.count})
+                      </option>
+                    ))}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
-              {selectedTech !== 'ALL' && (
+
+              <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setSelectedTech('ALL')}
-                  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
-                  title="Ver todos"
+                  type="button"
+                  onClick={() => setSelectedTech(prev => prev === 'ME' ? 'ALL' : 'ME')}
+                  className={`px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shrink-0 border ${
+                    selectedTech === 'ME'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                  }`}
+                  title="Visualizar apenas os meus saldos residuais"
                 >
-                  Limpar
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  <span>Meus Saldos</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${selectedTech === 'ME' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {myResidualCount}
+                  </span>
                 </button>
-              )}
+
+                {selectedTech !== 'ALL' && (
+                  <button
+                    onClick={() => setSelectedTech('ALL')}
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
+                    title="Ver todos"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

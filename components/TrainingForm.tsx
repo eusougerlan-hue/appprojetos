@@ -106,7 +106,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
 
   const pendingClients = useMemo(() => {
     let filtered = clients.filter(c => c.status === 'pending');
-    if (!isManager) {
+    if (!isManager || selectedTech === 'ME') {
       filtered = filtered.filter(c => 
         normalizeString(c.responsavelTecnico) === normalizeString(user.name)
       );
@@ -348,12 +348,25 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
     }
   };
 
+  const isMyLog = (l: TrainingLog) => {
+    return normalizeString(l.employeeName) === normalizeString(user?.name || '') ||
+           l.employeeId === user?.id;
+  };
+
+  const myLogsCount = useMemo(() => {
+    return logs.filter(l => isMyLog(l)).length;
+  }, [logs, user?.name, user?.id]);
+
   const filteredLogs = useMemo(() => {
     let list = [...logs];
-    if (isManager && selectedTech !== 'ALL') {
-      list = list.filter(l => 
-        normalizeString(l.employeeName) === normalizeString(selectedTech)
-      );
+    if (isManager) {
+      if (selectedTech === 'ME') {
+        list = list.filter(l => isMyLog(l));
+      } else if (selectedTech !== 'ALL') {
+        list = list.filter(l => 
+          normalizeString(l.employeeName) === normalizeString(selectedTech)
+        );
+      }
     }
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -365,7 +378,7 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
       });
     }
     return list;
-  }, [logs, isManager, selectedTech, searchTerm, clients]);
+  }, [logs, isManager, selectedTech, searchTerm, clients, user?.name, user?.id]);
 
   if (viewMode === 'list') {
     return (
@@ -395,41 +408,63 @@ const TrainingForm: React.FC<TrainingFormProps> = ({ clients, logs, user, onComp
               onChange={(e) => setSearchTerm(e.target.value)}
             />
 
-            {isManager && technicianList.length > 0 && (
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl">
-                <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <label className="block text-[7px] font-black uppercase text-slate-400 tracking-wider">Filtrar por Técnico</label>
-                  <select
-                    value={selectedTech}
-                    onChange={(e) => setSelectedTech(e.target.value)}
-                    className="w-full bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer appearance-none truncate"
-                  >
-                    <option value="ALL">Todos os Técnicos ({logs.length} atendimentos)</option>
-                    {technicianList.map(tech => {
-                      const count = logs.filter(l => normalizeString(l.employeeName) === normalizeString(tech)).length;
-                      return (
-                        <option key={tech} value={tech}>
-                          {tech} ({count})
-                        </option>
-                      );
-                    })}
-                  </select>
+            {isManager && (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl">
+                  <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-[7px] font-black uppercase text-slate-400 tracking-wider">Filtrar por Técnico</label>
+                    <select
+                      value={selectedTech}
+                      onChange={(e) => setSelectedTech(e.target.value)}
+                      className="w-full bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer appearance-none truncate"
+                    >
+                      <option value="ALL">Todos os Técnicos ({logs.length} atendimentos)</option>
+                      <option value="ME">👤 Apenas Meus Registros ({user?.name}) ({myLogsCount})</option>
+                      {technicianList
+                        .filter(tech => normalizeString(tech) !== normalizeString(user?.name || ''))
+                        .map(tech => {
+                          const count = logs.filter(l => normalizeString(l.employeeName) === normalizeString(tech)).length;
+                          return (
+                            <option key={tech} value={tech}>
+                              {tech} ({count})
+                            </option>
+                          );
+                        })}
+                    </select>
+                  </div>
+                  {selectedTech !== 'ALL' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTech('ALL')}
+                      className="text-[8px] font-black uppercase text-rose-500 hover:text-rose-700 bg-rose-50 px-2 py-0.5 rounded"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                  <svg className="w-3.5 h-3.5 text-slate-400 pointer-events-none flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-                {selectedTech !== 'ALL' && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTech('ALL')}
-                    className="text-[8px] font-black uppercase text-rose-500 hover:text-rose-700 bg-rose-50 px-2 py-0.5 rounded"
-                  >
-                    Limpar
-                  </button>
-                )}
-                <svg className="w-3.5 h-3.5 text-slate-400 pointer-events-none flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                </svg>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTech(prev => prev === 'ME' ? 'ALL' : 'ME')}
+                  className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shrink-0 border ${
+                    selectedTech === 'ME'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                  }`}
+                  title="Visualizar apenas os meus atendimentos"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  <span>Meus Atendimentos</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${selectedTech === 'ME' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {myLogsCount}
+                  </span>
+                </button>
               </div>
             )}
           </div>

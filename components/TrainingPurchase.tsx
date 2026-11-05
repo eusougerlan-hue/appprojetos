@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { SystemModule, Client, User, Customer, TrainingLog, UserRole, TrainingTypeEntity } from '../types';
 import { saveClient, getStoredModules, getStoredCustomers, getStoredClients, getStoredUsers, updateClient, deleteClient, getStoredTrainingTypes, getStoredIntegrations, normalizeString } from '../storage';
+import { playNotificationSound } from '../sound';
 
 interface TrainingPurchaseProps {
   user: User;
@@ -84,10 +85,20 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [allClients]);
 
+  const isMySale = (client: Client) => {
+    return normalizeString(client.responsavelTecnico) === normalizeString(user.name);
+  };
+
+  const mySalesCount = useMemo(() => {
+    return allClients.filter(c => isMySale(c)).length;
+  }, [allClients, user.name]);
+
   const visibleClients = useMemo(() => {
     let list = [...allClients];
     if (!isManager) {
-      list = list.filter(client => normalizeString(client.responsavelTecnico) === normalizeString(user.name));
+      list = list.filter(client => isMySale(client));
+    } else if (selectedTech === 'ME') {
+      list = list.filter(client => isMySale(client));
     } else if (selectedTech !== 'ALL') {
       list = list.filter(client => normalizeString(client.responsavelTecnico) === normalizeString(selectedTech));
     }
@@ -267,6 +278,8 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
         await updateClient(clientData);
       } else {
         await saveClient(clientData);
+        // Alerta sonoro imediato ao criar nova venda
+        playNotificationSound();
       }
       
       resetForm();
@@ -422,34 +435,57 @@ const TrainingPurchase: React.FC<TrainingPurchaseProps> = ({ user, onComplete })
             onChange={(e) => setSearchTerm(e.target.value)}
           />
 
-          {isManager && technicianList.length > 0 && (
-            <div className="flex items-center gap-2">
+          {isManager && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <div className="relative flex-1">
                 <select
                   value={selectedTech}
                   onChange={(e) => setSelectedTech(e.target.value)}
                   className="w-full bg-white border border-slate-200 text-slate-700 py-2.5 px-4 pr-9 rounded-xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
                 >
-                  <option value="ALL">Todos os Técnicos</option>
-                  {technicianList.map(t => (
-                    <option key={t.name} value={t.name}>
-                      {t.name} ({t.count})
-                    </option>
-                  ))}
+                  <option value="ALL">Todos os Técnicos ({allClients.length})</option>
+                  <option value="ME">👤 Apenas Minhas Vendas ({user.name}) ({mySalesCount})</option>
+                  {technicianList
+                    .filter(t => normalizeString(t.name) !== normalizeString(user.name))
+                    .map(t => (
+                      <option key={t.name} value={t.name}>
+                        {t.name} ({t.count})
+                      </option>
+                    ))}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
-              {selectedTech !== 'ALL' && (
+
+              <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setSelectedTech('ALL')}
-                  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
-                  title="Ver todos"
+                  type="button"
+                  onClick={() => setSelectedTech(prev => prev === 'ME' ? 'ALL' : 'ME')}
+                  className={`px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shrink-0 border ${
+                    selectedTech === 'ME'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                  }`}
+                  title="Visualizar apenas as minhas vendas"
                 >
-                  Limpar
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  <span>Minhas Vendas</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${selectedTech === 'ME' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {mySalesCount}
+                  </span>
                 </button>
-              )}
+
+                {selectedTech !== 'ALL' && (
+                  <button
+                    onClick={() => setSelectedTech('ALL')}
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
+                    title="Ver todos"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

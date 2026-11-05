@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+import { playNotificationSound } from '../sound';
 
 interface NotificationToastProps {
   message: string;
@@ -9,6 +10,9 @@ interface NotificationToastProps {
 
 const NotificationToast: React.FC<NotificationToastProps> = ({ message, subMessage, onClose }) => {
   useEffect(() => {
+    // Toca o alerta sonoro no momento em que a notificação é exibida
+    playNotificationSound();
+
     const timer = setTimeout(() => {
       onClose();
     }, 8000);
@@ -35,9 +39,19 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ message, subMessa
           <div className="mt-3 flex gap-2">
             <button 
               onClick={onClose}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-sm"
             >
               Entendido
+            </button>
+            <button 
+              onClick={() => playNotificationSound()}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-300 hover:text-white transition-all flex items-center gap-1.5"
+              title="Ouvir alerta sonoro novamente"
+            >
+              <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+              </svg>
+              Alerta Sonoro
             </button>
           </div>
         </div>

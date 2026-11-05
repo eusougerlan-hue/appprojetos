@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, UserRole, ViewState, Client, TrainingLog, BrandingConfig } from './types';
 import { getStoredClients, getStoredLogs, getStoredBranding, normalizeString } from './storage';
 import { isSupabaseConfigured } from './supabase';
+import { playNotificationSound } from './sound';
 import LoginForm from './components/LoginForm';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -60,6 +61,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; subMessage: string } | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const knownClientIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -78,7 +80,29 @@ const App: React.FC = () => {
         currentUser ? getStoredLogs() : Promise.resolve([]),
         getStoredBranding()
       ]);
-      setClients(storedClients || []);
+
+      const clientsList = storedClients || [];
+
+      // Detecta nova venda criada atribuída ao técnico responsável atualmente conectado
+      if (knownClientIdsRef.current !== null && currentUser) {
+        const newlyAssigned = clientsList.filter(c => 
+          !knownClientIdsRef.current!.has(c.id) &&
+          c.status === 'pending' &&
+          normalizeString(c.responsavelTecnico) === normalizeString(currentUser.name)
+        );
+
+        if (newlyAssigned.length > 0) {
+          const latest = newlyAssigned[0];
+          playNotificationSound();
+          setNotification({
+            message: `Nova Venda Atribuída: ${latest.razãoSocial}`,
+            subMessage: `Protocolo ${latest.protocolo || 'Pendente'} • ${latest.duracaoHoras}h Contratadas. Você é o técnico responsável!`
+          });
+        }
+      }
+
+      knownClientIdsRef.current = new Set(clientsList.map(c => c.id));
+      setClients(clientsList);
       setLogs(storedLogs || []);
       setBranding(brandData => ({ ...brandData, ...storedBranding }));
     } catch (error) {
@@ -88,6 +112,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
+    // Atualização periódica (polling) a cada 10s para tocar alerta sonoro ao receber nova venda
+    const interval = setInterval(() => {
+      refreshData();
+    }, 10000);
+    return () => clearInterval(interval);
   }, [refreshData]);
 
   useEffect(() => {
@@ -129,6 +158,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
+    knownClientIdsRef.current = null;
     setView('LOGIN');
     setIsSidebarOpen(false);
   };
