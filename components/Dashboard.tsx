@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { User, Client, TrainingLog, ViewState, UserRole } from '../types';
-import { getStoredUsers } from '../storage';
+import { getStoredUsers, normalizeString } from '../storage';
 
 interface DashboardProps {
   user: User;
@@ -9,6 +9,23 @@ interface DashboardProps {
   logs: TrainingLog[];
   setView: (view: ViewState) => void;
 }
+
+const parseDateParts = (dateStr: string) => {
+  if (!dateStr) return null;
+  const parts = dateStr.split(/[-/T ]/);
+  if (parts.length >= 2) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // 0-indexed
+    if (!isNaN(year) && !isNaN(month)) {
+      return { year, month };
+    }
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return { year: d.getFullYear(), month: d.getMonth() };
+  }
+  return null;
+};
 
 const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) => {
   const isManager = user.role === UserRole.MANAGER;
@@ -40,28 +57,69 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
   const techProductivity = useMemo(() => {
     if (!isManager || allUsers.length === 0) return [];
     const technicians = allUsers.filter(u => u.active !== false);
-    return technicians.map(tech => {
-      const techPending = clients.filter(c => {
-        const startDate = new Date(c.dataInicio);
-        return c.status === 'pending' && 
-               c.responsavelTecnico === tech.name &&
-               startDate.getMonth() === currentMonth &&
-               startDate.getFullYear() === currentYear;
+
+    const list = technicians.map(tech => {
+      // Clientes pendentes atribuídos a este técnico (status pendente ativo)
+      const techPending = clients.filter(c => 
+        c.status === 'pending' && 
+        normalizeString(c.responsavelTecnico) === normalizeString(tech.name)
+      ).length;
+
+      // Treinamentos finalizados pelo técnico no mês atual
+      const techCompleted = clients.filter(c => {
+        if (c.status !== 'completed') return false;
+        if (normalizeString(c.responsavelTecnico) !== normalizeString(tech.name)) return false;
+        if (c.dataFim) {
+          const parts = parseDateParts(c.dataFim);
+          if (parts) {
+            return parts.month === currentMonth && parts.year === currentYear;
+          }
+        }
+        return true;
       }).length;
+
+      // Sessões de atendimento realizadas pelo técnico no mês atual
       const techLogs = logs.filter(l => {
-        const logDate = new Date(l.date);
-        return l.employeeId === tech.id &&
-               logDate.getMonth() === currentMonth &&
-               logDate.getFullYear() === currentYear;
+        const isMatch = (l.employeeId && l.employeeId === tech.id) || 
+                        (l.employeeName && normalizeString(l.employeeName) === normalizeString(tech.name));
+        if (!isMatch) return false;
+        const parts = parseDateParts(l.date);
+        if (parts) {
+          return parts.month === currentMonth && parts.year === currentYear;
+        }
+        return true;
       }).length;
+
       return {
         id: tech.id,
         name: tech.name,
         pending: techPending,
-        completed: 0, // Simplified for this view
+        completed: techCompleted,
         sessions: techLogs
       };
-    }).sort((a, b) => b.sessions - a.sessions);
+    });
+
+    // Se houver clientes pendentes sem responsável ou com responsável não cadastrado, exibe linha de Não Atribuído
+    const unassignedPending = clients.filter(c => 
+      c.status === 'pending' && 
+      (!c.responsavelTecnico || !allUsers.some(u => normalizeString(u.name) === normalizeString(c.responsavelTecnico)))
+    ).length;
+
+    if (unassignedPending > 0) {
+      list.push({
+        id: 'unassigned',
+        name: 'Não Atribuído',
+        pending: unassignedPending,
+        completed: 0,
+        sessions: 0
+      });
+    }
+
+    return list.sort((a, b) => {
+      if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+      if (b.pending !== a.pending) return b.pending - a.pending;
+      return a.name.localeCompare(b.name);
+    });
   }, [isManager, allUsers, clients, logs, currentMonth, currentYear]);
 
   return (
@@ -133,17 +191,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, clients, logs, setView }) =
                   <tr key={tech.id} className="hover:bg-blue-50/20 transition-colors">
                     <td className="px-4 md:px-6 py-2 md:py-3">
                       <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-[8px] md:text-[10px]">
-                          {tech.name.charAt(0)}
+                        <div className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center text-white font-black text-[8px] md:text-[10px] ${
+                          tech.id === 'unassigned' ? 'bg-amber-500' : 'bg-blue-600'
+                        }`}>
+                          {tech.id === 'unassigned' ? '?' : tech.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-gray-700 text-[10px] md:text-xs truncate max-w-[80px] md:max-w-none">{tech.name}</span>
+                        <span className="font-bold text-gray-700 text-[10px] md:text-xs truncate max-w-[80px] md:max-w-none">
+                          {tech.name}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 md:px-6 py-2 md:py-3 text-center">
-                      <span className="text-[10px] md:text-xs font-bold text-gray-400">{tech.pending}</span>
+                      <span className={`text-[10px] md:text-xs font-bold ${
+                        tech.pending > 0 ? 'text-orange-600 font-black bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100' : 'text-gray-400'
+                      }`}>
+                        {tech.pending}
+                      </span>
                     </td>
                     <td className="px-4 md:px-6 py-2 md:py-3 text-center">
-                      <span className="text-[10px] md:text-xs font-bold text-gray-400">0</span>
+                      <span className={`text-[10px] md:text-xs font-bold ${
+                        tech.completed > 0 ? 'text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100' : 'text-gray-400'
+                      }`}>
+                        {tech.completed}
+                      </span>
                     </td>
                     <td className="px-4 md:px-6 py-2 md:py-3 text-center">
                       <span className="text-[11px] md:text-sm font-black text-blue-600">{tech.sessions}</span>
