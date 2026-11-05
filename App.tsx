@@ -191,7 +191,7 @@ const App: React.FC = () => {
             {view === 'TRAINING_TYPE_MGMT' && <TrainingTypeManagement onComplete={() => setView('DASHBOARD')} />}
             {view === 'PROFITABILITY' && <ProfitabilityReport clients={clients} logs={logs} />}
             {view === 'TIME_MANAGEMENT' && <TimeManagement clients={clients} logs={logs} />}
-            {view === 'COMMISSION_PAYMENT' && <CommissionPayment clients={clients} refreshData={refreshData} />}
+            {view === 'COMMISSION_PAYMENT' && <CommissionPayment clients={clients} user={currentUser!} refreshData={refreshData} />}
             {view === 'INTEGRATIONS' && <Integrations onBrandingChange={refreshData} />}
           </div>
         </main>
